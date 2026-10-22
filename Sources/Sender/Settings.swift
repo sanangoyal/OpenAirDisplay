@@ -172,6 +172,7 @@ import UserNotifications
     @AppStorage("notif") var notif = true
     @AppStorage("audio") var audio = true
     @AppStorage("acceptInput") var acceptInput = true
+    @AppStorage("agentControl") var agentControl = false
     @StateObject var login = Flag(SMAppService.mainApp.status == .enabled)
     var body: some View {
         Form {
@@ -184,6 +185,17 @@ import UserNotifications
                 Row(title: "Accessibility", info: "macOS requires this permission before an app can send keyboard and mouse events.") {
                     HStack { Text(Injector.trusted ? "Allowed" : "Not allowed").foregroundStyle(.secondary)
                         Button("Open…") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!) } }
+                }
+            }
+            Section("AI agents & scripts") {
+                Row(title: "Allow AI agents & scripts", info: "Lets AI assistants and scripts on this Mac check status, run diagnostics, and change quality, link and receivers. Local only, this user only. Pairing new Macs, keyboard/mouse forwarding and the role always stay manual.") { Toggle("", isOn: $agentControl).labelsHidden() }
+                if agentControl {
+                    Row(title: "Connect an agent", info: "Adds AirDisplay as an MCP server. Claude Code: run the copied command in a terminal. Other apps (Claude desktop, Cursor…): paste the JSON into their MCP settings.") {
+                        HStack {
+                            Button("Copy Claude Code command") { copyText("claude mcp add airdisplay -- \"" + (Bundle.main.executablePath ?? "AirDisplay") + "\" --mcp") }
+                            Button("Copy JSON config") { copyText("{\n  \"mcpServers\": {\n    \"airdisplay\": { \"command\": \"" + (Bundle.main.executablePath ?? "AirDisplay") + "\", \"args\": [\"--mcp\"] }\n  }\n}") }
+                        }
+                    }
                 }
             }
             Section("This Mac") {
@@ -527,3 +539,5 @@ import UserNotifications
     }
     func windowWillClose(_ n: Notification) { app.stopUITimer() }
 }
+
+func copyText(_ t: String) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(t, forType: .string) }

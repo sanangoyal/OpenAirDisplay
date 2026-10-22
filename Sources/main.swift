@@ -2,6 +2,10 @@ import Cocoa
 
 setvbuf(stdout, nil, _IOLBF, 0)
 
+// Headless modes for agents/scripts: no UI, no single-instance guard (they only talk to the running app).
+if CommandLine.arguments.contains("--mcp") { runMCP(); exit(0) }
+if let i = CommandLine.arguments.firstIndex(of: "--ctl") { runCtl(Array(CommandLine.arguments.dropFirst(i + 1))); exit(0) }
+
 // One copy only: two copies would both grab the same receiver and keep kicking each other off (the lower PID wins; a
 // relaunch after a role switch waits a moment for the old copy to quit).
 if let bid = Bundle.main.bundleIdentifier {

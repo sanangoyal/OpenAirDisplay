@@ -107,3 +107,21 @@ Issues and pull requests welcome. Source layout: `Sources/Sender` (main Mac), `S
 ## License
 
 MIT. See [LICENSE](LICENSE). Not affiliated with Apple.
+
+## AI agents & scripts (MCP)
+
+AirDisplay can be driven by AI assistants and scripts. It is **off by default**: turn on *Settings › General › Allow AI agents & scripts*, then use the two copy buttons there.
+
+```
+claude mcp add airdisplay -- /Applications/AirDisplay.app/Contents/MacOS/AirDisplay --mcp
+```
+
+or in any MCP client's config:
+
+```json
+{ "mcpServers": { "airdisplay": { "command": "/Applications/AirDisplay.app/Contents/MacOS/AirDisplay", "args": ["--mcp"] } } }
+```
+
+Tools: `get_status`, `list_receivers`, `use_receiver`, `stop_using_receiver`, `pause_streaming`, `resume_streaming`, `set_quality`, `set_link`, `restart_stream`, and `diagnose` (health report with findings and suggested fixes). Scripts can use `AirDisplay --ctl <tool> '{"json":"args"}'`.
+
+Security: the app listens on a Unix socket in `~/Library/Application Support/AirDisplay/` (mode 0600, peer UID checked), never on the network. Pairing a new Mac, keyboard/mouse forwarding, the role and reset are not exposed; they always need the person.

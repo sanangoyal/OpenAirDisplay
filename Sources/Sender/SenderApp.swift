@@ -35,6 +35,7 @@ final class Ladder {
     var lastChange: Date { get { L0.lastChange } set { L0.lastChange = newValue } }
     var blockedUntil: [Date] { get { L0.blocked } set { L0.blocked = newValue } }
     var guide: Guide?
+    var ctlServer: ControlServer?
     let live = Live()
     var settings: SettingsWindow?
     var uiTimer: Timer?
@@ -67,6 +68,7 @@ final class Ladder {
         if notifOn { UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { _, _ in } }
         effIdx = autoQ ? 2 : qualityMode
         guide = Guide(app: self)
+        ctlServer = ControlServer(self)
         settings = SettingsWindow(app: self)
         if CommandLine.arguments.contains("--settings") { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.settings?.show(Pane.allCases.first { p in CommandLine.arguments.contains("--pane=" + p.rawValue) }) } }
         if !defaults.bool(forKey: "onboarded") { DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.guide?.show() } }
