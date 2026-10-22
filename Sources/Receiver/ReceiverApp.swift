@@ -39,7 +39,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     // keyboard + mouse forwarding (opt-in) and connection watchdog
     var forwardInput: Bool { get { UserDefaults.standard.bool(forKey: "rxForward") } set { UserDefaults.standard.set(newValue, forKey: "rxForward"); if streaming { newValue ? setupInput() : teardownInput() } } }
     var inputMonitor: Any?
-    var escTimer: Timer?, escFired = false
+    var escTimer: Timer?, escFired = false, ringTimer: Timer?, ring: CALayer?
     var lastRx = Date()
     var watchdog: Timer?
     lazy var settings = ReceiverSettings(self)
@@ -351,11 +351,33 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func teardownInput() {
+        hideRing()
         if let m = inputMonitor { NSEvent.removeMonitor(m); inputMonitor = nil }
         escTimer?.invalidate(); escTimer = nil; escFired = false
         win?.acceptsMouseMovedEvents = false
         CGAssociateMouseAndMouseCursorPosition(1)
     }
+
+    /// "Hold Esc to leave" progress ring: fills over the 1.5 s hold.
+    func showRing() {
+        guard let v = win?.contentView, let root = v.layer else { return }
+        hideRing()
+        let size: CGFloat = 84, c = CGPoint(x: size / 2, y: size / 2), r: CGFloat = 30
+        let box = CALayer(); box.frame = CGRect(x: v.bounds.midX - size / 2, y: v.bounds.midY - size / 2, width: size, height: size)
+        box.backgroundColor = NSColor.black.withAlphaComponent(0.55).cgColor; box.cornerRadius = size / 2
+        let path = CGMutablePath(); path.addArc(center: c, radius: r, startAngle: .pi / 2, endAngle: -3 * .pi / 2, clockwise: true)
+        func shape(_ color: NSColor) -> CAShapeLayer {
+            let s = CAShapeLayer(); s.frame = box.bounds; s.path = path; s.fillColor = nil; s.strokeColor = color.cgColor; s.lineWidth = 5; s.lineCap = .round; return s
+        }
+        let track = shape(NSColor.white.withAlphaComponent(0.25)), arc = shape(.white)
+        let a = CABasicAnimation(keyPath: "strokeEnd"); a.fromValue = 0; a.toValue = 1; a.duration = 1.25; a.timingFunction = CAMediaTimingFunction(name: .linear)
+        arc.add(a, forKey: "fill")
+        let t = CATextLayer(); t.string = "esc"; t.fontSize = 15; t.alignmentMode = .center; t.foregroundColor = NSColor.white.cgColor
+        t.contentsScale = NSScreen.screens.first?.backingScaleFactor ?? 2; t.frame = CGRect(x: 0, y: c.y - 9, width: size, height: 20)
+        box.addSublayer(track); box.addSublayer(arc); box.addSublayer(t)
+        root.addSublayer(box); ring = box
+    }
+    func hideRing() { ringTimer?.invalidate(); ringTimer = nil; ring?.removeFromSuperlayer(); ring = nil }
 
     func forward(_ e: NSEvent) {
         let fl = UInt64(e.modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue)
@@ -380,13 +402,15 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             if e.keyCode == 53 {   // Esc: tap goes to the main Mac, hold 1.5 s pauses this screen
                 if !e.isARepeat && escTimer == nil {
                     escFired = false
-                    escTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in self?.escTimer = nil; self?.escFired = true; self?.pause() }
+                    ringTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { [weak self] _ in self?.showRing() }   // not for quick taps
+                    escTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in self?.escTimer = nil; self?.escFired = true; self?.hideRing(); self?.pause() }
                 }
                 return
             }
             sendInput(InputEvent(kind: .keyDown, code: e.keyCode, flags: fl))
         case .keyUp:
             if e.keyCode == 53 {
+                hideRing()
                 if escTimer != nil { escTimer?.invalidate(); escTimer = nil
                     sendInput(InputEvent(kind: .keyDown, code: 53, flags: fl)); sendInput(InputEvent(kind: .keyUp, code: 53, flags: fl)) }
                 escFired = false
