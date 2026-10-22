@@ -1,5 +1,28 @@
 import Cocoa
 import Network
+import SwiftUI
+import Darwin
+
+/// What agents and scripts did, newest first. In memory only (gone when the app quits) and shown in Settings › General.
+struct AgentEvent: Identifiable { let id = UUID(); let time: Date; let client: String; let action: String; let ok: Bool; let note: String }
+@available(macOS 13.0, *) final class AgentLog: ObservableObject {
+    static let shared = AgentLog()
+    @Published var events: [AgentEvent] = []
+    func add(_ e: AgentEvent) { events.insert(e, at: 0); if events.count > 100 { events.removeLast(events.count - 100) } }
+    func clear() { events = [] }
+}
+
+/// Name of the program on the other end of the socket. The `--mcp` bridge is a copy of this app, so for it report the program that launched it.
+func peerName(_ fd: Int32) -> String {
+    var pid: pid_t = 0; var len = socklen_t(MemoryLayout<pid_t>.size)
+    guard getsockopt(fd, SOL_LOCAL, LOCAL_PEERPID, &pid, &len) == 0, pid > 0 else { return "unknown" }
+    func name(_ p: pid_t) -> String { var b = [CChar](repeating: 0, count: 256); proc_name(p, &b, 255); return String(cString: b) }
+    func parent(_ p: pid_t) -> pid_t { var i = proc_bsdinfo(); return proc_pidinfo(p, PROC_PIDTBSDINFO, 0, &i, Int32(MemoryLayout<proc_bsdinfo>.size)) > 0 ? pid_t(i.pbi_ppid) : 0 }
+    let n = name(pid)
+    if pid == getpid() { return n }
+    if n == (Bundle.main.executableURL?.lastPathComponent ?? "") { let pp = parent(pid); if pp > 1 { let pn = name(pp); return pn.isEmpty ? n : pn } }
+    return n.isEmpty ? "pid \(pid)" : n
+}
 
 /// Local control socket for AI agents and scripts. Off unless the person turns it on (Settings › General).
 /// Unix socket in the user's Application Support folder, mode 0600, peer UID checked: only this user's processes can talk to it.
@@ -58,10 +81,16 @@ import Network
         guard let line = Ctl.readLine(c), let req = try? JSONSerialization.jsonObject(with: line) as? [String: Any], let cmd = req["cmd"] as? String else {
             Ctl.writeAll(c, Data("{\"ok\":false,\"error\":\"bad request\"}\n".utf8)); return
         }
+        let client = peerName(c)
         let net: [String: Any] = cmd == "diagnose" ? ControlServer.networkSnapshot() : [:]   // slow shell calls stay off the main thread
         var out: [String: Any] = [:]
         DispatchQueue.main.sync { out = self.app.control(cmd, req, net) }
-        dlog("control: \(cmd) → \(out["ok"] as? Bool ?? false)")
+        let okv = out["ok"] as? Bool ?? false
+        dlog("control: \(cmd) → \(okv)")
+        let args = req.filter { $0.key != "cmd" }.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: " ")
+        let note = String(((out["error"] ?? out["result"]) as? String ?? "").prefix(80))
+        let ev = AgentEvent(time: Date(), client: client, action: cmd + (args.isEmpty ? "" : " " + args), ok: okv, note: note)
+        DispatchQueue.main.async { AgentLog.shared.add(ev) }
         var d = (try? JSONSerialization.data(withJSONObject: out)) ?? Data("{\"ok\":false}".utf8)
         d.append(10)
         Ctl.writeAll(c, d)
@@ -224,7 +253,7 @@ import Network
         if defaults.object(forKey: "acceptInput") as? Bool ?? true, !Injector.trusted { add("info", "Accessibility permission is off, so keyboard and mouse from the extra screen cannot be used.", "System Settings › Privacy & Security › Accessibility: turn AirDisplay on.") }
         if net["internetReachable"] as? Bool == false { add("warn", "This Mac cannot reach the internet. If it is also an Ethernet-linked pair, a link-only adapter may have become the default route.", "Check the Mac's network service order and that the direct cable network has no router set.") }
         let log = recentLog(80)
-        let failures = log.filter { $0.contains("failed") || $0.contains("closed connection") }.count
+        let failures = log.filter { $0.contains("failed") || $0.contains("closed the connection") }.count
         if failures >= 4 { add("warn", "\(failures) recent connection failures in the event log.", "Look at recentEvents; common causes are the receiver asleep, duplicate app copies, or a cable/network change.") }
         if findings.isEmpty { add("ok", "No problems found.", "") }
 

@@ -51,7 +51,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
     var hs: Handshake
     var chan: Channel?
     var deframer = Deframer()
-    var receiverName = "iMac"
+    var receiverName = "Receiver"
     var lastPongAt = Date()
     var onNumber: ((String, @escaping (Bool) -> Void) -> Void)?   // pairing: show the 6-digit number, user answers yes/no
     var onVersion: ((String) -> Void)?
@@ -144,7 +144,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] d, _, done, err in
             guard let self = self, !self.ended else { return }
             if let d = d { self.onData(d) }
-            if done || err != nil { self.fail(self.live ? "iMac closed connection" : nil) } else { self.recvLoop() }
+            if done || err != nil { self.fail(self.live ? "Receiver closed the connection" : nil) } else { self.recvLoop() }
         }
     }
 
@@ -395,7 +395,6 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
             if let a = CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: false) as? [[CFString: Any]],
                let f = a.first, (f[kCMSampleAttachmentKey_NotSync] as? Bool) == true { key = false }
             if key, let fd = CMSampleBufferGetFormatDescription(sb) {
-                let w0 = self.capW, h0 = self.capH
                 var cfg = Data(); var count = 0
                 let isH = self.hevc
                 func ps(_ i: Int, _ ptr: inout UnsafePointer<UInt8>?, _ sz: inout Int, _ cnt: UnsafeMutablePointer<Int>?) {

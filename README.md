@@ -49,7 +49,7 @@ git clone https://github.com/<you>/AirDisplay && cd AirDisplay
 scripts/build.sh --install      # builds a universal app into ~/Applications
 ```
 
-Copy `~/Applications/AirDisplay.app` to the other Mac too (AirDrop, USB stick, anything). Because it is not notarized, macOS may block the first launch of the copy: right-click › Open, or run `xattr -cr AirDisplay.app`.
+Copy `~/Applications/AirDisplay.app` to the other Mac too (AirDrop, USB stick, anything). Because it is not notarized, macOS may block the first launch of the copy. On recent macOS, right-click › Open no longer works for this: open System Settings › Privacy & Security, scroll down and click **Open Anyway**, or run `xattr -cr AirDisplay.app`.
 
 Tip: sign with a stable certificate so macOS keeps the Screen Recording permission across rebuilds:
 
@@ -91,22 +91,11 @@ Yes. Ed25519 identity keys are pinned at pairing, session keys come from X25519,
 ## Limitations
 
 - Private API; may break on new macOS releases.
+- Protected video (Netflix, Hotstar, Disney+ and similar) shows black on the extra screen. macOS hides DRM video from screen capture, exactly as with Sidecar and DisplayLink. Play it on the extra Mac itself instead.
 - Input forwarding is basic: system shortcuts on the extra Mac (Cmd+Tab, Mission Control) stay local, and it needs Accessibility permission on the main Mac.
 - Sender needs macOS 13+.
 - Several extra screens work, but only the first one gets sound, and multi-screen has so far been tested only in code, not with three real Macs.
 - Not notarized.
-
-## Roadmap
-
-signed and notarized releases, Homebrew cask.
-
-## Contributing
-
-Issues and pull requests welcome. Source layout: `Sources/Sender` (main Mac), `Sources/Receiver` (extra screen), `Sources/Shared` (protocol, crypto, Wake-on-LAN).
-
-## License
-
-MIT. See [LICENSE](LICENSE). Not affiliated with Apple.
 
 ## AI agents & scripts (MCP)
 
@@ -125,3 +114,31 @@ or in any MCP client's config:
 Tools: `get_status`, `list_receivers`, `use_receiver`, `stop_using_receiver`, `pause_streaming`, `resume_streaming`, `set_quality`, `set_link`, `restart_stream`, and `diagnose` (health report with findings and suggested fixes). Scripts can use `AirDisplay --ctl <tool> '{"json":"args"}'`.
 
 Security: the app listens on a Unix socket in `~/Library/Application Support/AirDisplay/` (mode 0600, peer UID checked), never on the network. Pairing a new Mac, keyboard/mouse forwarding, the role and reset are not exposed; they always need the person.
+
+## Privacy
+
+No accounts, no analytics, no telemetry, no servers. Video, sound and input go directly between your two Macs, encrypted, and only to Macs you paired. The app stores your settings and the public keys of paired Macs on each Mac, nothing else. It makes no internet connections.
+
+Permissions it asks for: **Screen Recording** (capture the virtual display it creates), **Local Network** (find your other Mac), **Accessibility** (only if you turn on keyboard and mouse from the extra screen), and **Notifications** (optional banners).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for how pairing and encryption work, known limits, and how to report a vulnerability.
+
+## Roadmap
+
+Signed and notarized releases, Homebrew cask.
+
+## Contributing
+
+Issues and pull requests welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+## License and disclaimer
+
+MIT. See [LICENSE](LICENSE). The software is provided "as is", without warranty of any kind, and you use it at your own risk; the author is not liable for any damage, data loss or hardware problems arising from its use.
+
+AirDisplay is not affiliated with or endorsed by Apple Inc. Mac, macOS, iMac, MacBook, Thunderbolt and AirDrop are trademarks of Apple Inc. It is also unrelated to other products called "Air Display".
+
+## Credits
+
+Made by [Sanan Goyal](https://sanangoyal.com).

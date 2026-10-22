@@ -108,7 +108,9 @@ final class ReceiverSettings: NSObject, NSWindowDelegate {
         let reset = NSButton(title: "Show role chooser at next launch…", target: self, action: #selector(resetRole))
         let ab: [NSView] = [text("AirDisplay", size: 20, weight: .bold), row("Version", text("\(v) (\(b))")), row("Role", text("Extra screen")),
             row("Mac", text(hardwareModel(), color: .secondaryLabelColor)), row("macOS", text(osVersionString(), color: .secondaryLabelColor)),
-            row("", copy), row("", reset)]
+            row("", copy), row("", reset),
+            row("Made by", text("Sanan Goyal · sanangoyal.com", color: .secondaryLabelColor)),
+            row("", hint("No accounts, no analytics, no servers: everything goes directly between your Macs, encrypted, and only to Macs you paired. Free software under the MIT License, provided “as is” without warranty. Use at your own risk. Not affiliated with or endorsed by Apple. Mac, macOS and iMac are trademarks of Apple Inc."))]
         t.addTabViewItem(tab("About", page(ab)))
         tick()
     }

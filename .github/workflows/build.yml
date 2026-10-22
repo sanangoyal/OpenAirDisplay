@@ -1,0 +1,11 @@
+name: build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Protocol tests
+        run: scripts/test.sh
+      - name: Build universal app
+        run: scripts/build.sh
