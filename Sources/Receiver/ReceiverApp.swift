@@ -55,7 +55,12 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func applicationWillTerminate(_ n: Notification) { CGAssociateMouseAndMouseCursorPosition(1) }
 
+    var sigSources: [DispatchSourceSignal] = []
     func applicationDidFinishLaunching(_ n: Notification) {
+        // Test hooks: `kill -USR1 <pid>` pauses, `kill -USR2 <pid>` resumes.
+        for (sig, act) in [(SIGUSR1, { [weak self] in self?.pause() }), (SIGUSR2, { [weak self] in self?.resume() })] as [(Int32, () -> Void)] {
+            signal(sig, SIG_IGN); let src = DispatchSource.makeSignalSource(signal: sig, queue: .main); src.setEventHandler(handler: act); src.resume(); sigSources.append(src)
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(screenChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         item.button?.image = menuGlyph(filled: false, back: true)
         let m = NSMenu(); m.delegate = self; m.autoenablesItems = false; item.menu = m
@@ -65,13 +70,14 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     // MARK: network
     func startListener() {
+        dlog("rx startListener")
         let tcp = NWProtocolTCP.Options(); tcp.noDelay = true
         tcp.enableKeepalive = true; tcp.keepaliveIdle = 3; tcp.keepaliveInterval = 1; tcp.keepaliveCount = 3
         guard let l = try? NWListener(using: NWParameters(tls: nil, tcp: tcp), on: 7777) else { print("listen fail"); retryListener(); return }
         l.service = NWListener.Service(type: "_odisplay._tcp", txtRecord: NWTXTRecord(["id": keys.myID, "v": "1"]))
         l.newConnectionHandler = { [weak self] c in self?.accept(c) }
         l.stateUpdateHandler = { [weak self, weak l] st in
-            print("listener:", st)
+            print("listener:", st); dlog("rx listener \(st)")
             if case .failed = st { l?.cancel(); self?.retryListener() }
         }
         l.start(queue: q); listener = l
@@ -90,6 +96,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func accept(_ c: NWConnection) {
+        dlog("rx accept \(c.endpoint)")
         let hs = Handshake(role: .server, keys: keys, name: myName)
         hs.serverCode = { [weak self] in self?.currentCode() }
         hs.serverAttemptFailed = { [weak self] in
@@ -305,6 +312,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func hideWindow() {
         guard streaming else { return }
+        dlog("rx hideWindow")
         streaming = false
         teardownInput(); watchdog?.invalidate(); watchdog = nil
         item.button?.image = menuGlyph(filled: false, slashed: paused, back: true)
@@ -422,12 +430,13 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func pause() {
+        dlog("rx pause")
         paused = true
         item.button?.image = menuGlyph(filled: false, slashed: true, back: true)
         hideWindow()
         listener?.cancel(); listener = nil
     }
-    func resume() { paused = false; item.button?.image = menuGlyph(filled: false, back: true); startListener() }
+    func resume() { dlog("rx resume"); paused = false; item.button?.image = menuGlyph(filled: false, back: true); startListener() }
 
     // MARK: pairing UI
     func openPairing() {

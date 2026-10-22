@@ -120,6 +120,13 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
             }
         }
         conn.start(queue: q)
+        // A Bonjour endpoint that vanished (receiver paused / gone) can sit in 'preparing' forever: give up, then retry cleanly.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self = self, !self.ended, !self.live else { return }
+            if case .ready = self.conn.state { return }
+            dlog("tx connect timeout state=\(self.conn.state)")
+            self.end(nil)
+        }
     }
 
     func fail(_ reason: String?) { DispatchQueue.main.async { self.end(reason) } }

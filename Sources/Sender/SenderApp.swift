@@ -73,7 +73,7 @@ import SwiftUI
                 if case let .bonjour(txt) = r.metadata, let v = txt.dictionary["id"] { id = v }
                 f[id] = Found(id: id, name: name, endpoint: r.endpoint, ifaces: Array(r.interfaces))
             }
-            DispatchQueue.main.async { if let s = self, Set(f.keys) != Set(s.found.keys) { s.badIface.removeAll() }; self?.found = f; self?.tick() }
+            DispatchQueue.main.async { dlog("tx browse: \(f.count) found"); if let s = self, Set(f.keys) != Set(s.found.keys) { s.badIface.removeAll() }; self?.found = f; self?.tick() }
         }
         b.stateUpdateHandler = { st in if case .failed = st { DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.startBrowser() } } }
         b.start(queue: .main)
@@ -202,6 +202,7 @@ import SwiftUI
     }
 
     func startSession(_ endpoint: NWEndpoint, code: String?, iface: NWInterface? = nil) {
+        dlog("tx startSession \(endpoint) iface=\(iface?.name ?? "-")")
         var iface = iface
         if iface == nil, let f = found.values.first(where: { $0.endpoint == endpoint }) { iface = candidates(f).first }
         if autoQ {   // start at the best level the link allows; auto drops if it struggles
@@ -223,6 +224,7 @@ import SwiftUI
         }
         s.onEnd = { [weak self, weak s] reason in
             guard let self = self, let s = s else { return }
+            dlog("tx session end: \(reason ?? "nil") live=\(s.live)")
             if self.session === s { self.session = nil }
             if !s.live, let i = s.forceIface, reason != "Restarting", reason != "Sleeping", reason != "PERMISSION", s.pairCode == nil, Date().timeIntervalSince(s.startedAt) >= 3 { self.badIface[i.name] = Date().addingTimeInterval(20) }
             if self.wasLive { self.wasLive = false; if reason != "Restarting" && reason != "Sleeping" { self.notify("Display disconnected", reason ?? "Receiver went away") } }
