@@ -380,7 +380,7 @@ final class Ladder {
         }
         if permissionProblem { act(menu, "Open Screen Recording Settings…", #selector(openPrivacy)) }
         menu.addItem(.separator())
-        let pm = act(menu, enabled ? "Pause Streaming" : "Resume Streaming", #selector(toggleEnabled)); pm.keyEquivalent = "d"; pm.keyEquivalentModifierMask = [.control, .option, .command]
+        let pm = act(menu, !enabled ? "Resume Streaming" : (session?.stream != nil || extras.values.contains { $0.stream != nil } ? "Pause Streaming" : "Stop Looking for Receivers"), #selector(toggleEnabled)); pm.keyEquivalent = "d"; pm.keyEquivalentModifierMask = [.control, .option, .command]
         menu.addItem(.separator())
 
         // Receivers
