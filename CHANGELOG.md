@@ -1,6 +1,10 @@
 # Changelog
 
-## 3.2 (unreleased)
+## 3.2.1
+
+- Setup guide now survives the restart macOS forces after Screen Recording is granted, and picks up where you left off.
+
+## 3.2
 
 - Agent control: local MCP server (`OpenAirDisplay --mcp`), `--ctl` command line, and a `diagnose` health report. Off by default; activity log in Settings.
 - Per-receiver quality ladders (a slow extra screen no longer drags the others down).
