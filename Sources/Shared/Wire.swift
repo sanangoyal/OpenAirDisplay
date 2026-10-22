@@ -3,7 +3,7 @@ import CryptoKit
 
 // Message types (inside the encrypted channel)
 enum MT {
-    static let config: UInt8 = 0, frame: UInt8 = 1, ping: UInt8 = 2, pong: UInt8 = 3, info: UInt8 = 4, audio: UInt8 = 5
+    static let config: UInt8 = 0, frame: UInt8 = 1, ping: UInt8 = 2, pong: UInt8 = 3, info: UInt8 = 4, audio: UInt8 = 5, input: UInt8 = 6
     // plaintext handshake
     static let cHello: UInt8 = 0x10, sHello: UInt8 = 0x11, cAuth: UInt8 = 0x12, sAuth: UInt8 = 0x13, reject: UInt8 = 0x1F
 }

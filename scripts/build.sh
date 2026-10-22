@@ -13,7 +13,7 @@ rm -rf "$OUT"; mkdir -p "$OUT/$APP/Contents/MacOS" "$OUT/$APP/Contents/Resources
 
 SRC=(Sources/main.swift Sources/Role.swift Sources/Receiver/*.swift Sources/Sender/*.swift Sources/Shared/*.swift)
 FW=(-framework Cocoa -framework AVFoundation -framework VideoToolbox -framework Network
-    -framework UserNotifications -framework SwiftUI -framework ServiceManagement
+    -framework UserNotifications -framework SwiftUI -framework ServiceManagement -framework Carbon
     -Xlinker -weak_framework -Xlinker ScreenCaptureKit -Xlinker -weak_framework -Xlinker Charts)
 
 # The Command Line Tools ship no x86_64 Swift back-deployment shims; provide empty ones.

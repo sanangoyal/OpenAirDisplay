@@ -50,7 +50,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
     var hs: Handshake
     var chan: Channel?
     var deframer = Deframer()
-    var receiverName = "Display"
+    var receiverName = "iMac"
     var onVersion: ((String) -> Void)?
     var capW = 0, capH = 0, backW = 0, backH = 0
 
@@ -127,7 +127,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] d, _, done, err in
             guard let self = self, !self.ended else { return }
             if let d = d { self.onData(d) }
-            if done || err != nil { self.fail(self.live ? "Receiver closed connection" : nil) } else { self.recvLoop() }
+            if done || err != nil { self.fail(self.live ? "iMac closed connection" : nil) } else { self.recvLoop() }
         }
     }
 
@@ -165,6 +165,8 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
                 if self.live, w != self.rxW || h != self.rxH { self.end("Restarting"); return }   // receiver display changed: resize
                 self.goLive(name: name, w: w, h: h)
             }
+        case MT.input:
+            if let ev = InputEvent(p) { DispatchQueue.main.async { if !self.ended { Injector.shared.handle(ev, display: self.vd?.displayID ?? CGMainDisplayID()) } } }
         case MT.pong:
             guard p.count >= 12 else { return }
             let ts = p.withUnsafeBytes { UInt64(bigEndian: $0.loadUnaligned(fromByteOffset: 0, as: UInt64.self)) }
@@ -432,6 +434,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
     func end(_ reason: String?) {
         if ended { return }
         ended = true
+        DispatchQueue.main.async { Injector.shared.releaseAll() }
         statTimer?.invalidate(); idleTimer?.invalidate(); lastPB = nil
         conn.cancel()
         if let s = stream { Task { try? await s.stopCapture() } }

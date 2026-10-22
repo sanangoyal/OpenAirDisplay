@@ -82,8 +82,10 @@ final class ReceiverSettings: NSObject, NSWindowDelegate {
         let dis: [NSView] = [row("Scaling", fit),
             row("", hint("Fit shows the whole picture. Fill zooms to remove black bars if the other Mac's shape differs.")),
             row("Mouse pointer", check("Hide pointer on the extra screen", app.hidePointer, #selector(togglePointer))),
+            row("Input", check("Send this Mac's keyboard & mouse to the main Mac", app.forwardInput, #selector(toggleForward))),
+            row("", hint("Tap Esc is sent on. Hold Esc for 1.5 s to leave the extra screen. The main Mac must allow it (Settings › General › Accept keyboard & mouse) and grant Accessibility.")),
             row("Power", check("Keep this Mac awake while showing", app.keepAwake, #selector(toggleAwake))),
-            row("", hint("Press Esc on this Mac anytime to pause and use it normally.")),
+            row("", hint("Without input forwarding, press Esc to pause and use this Mac normally.")),
             row("Resolution", valueLabel("res"))]
         t.addTabViewItem(tab("Display", page(dis)))
 
@@ -146,6 +148,7 @@ final class ReceiverSettings: NSObject, NSWindowDelegate {
     @objc func toggleSound() { app.toggleSound() }
     @objc func fitChanged(_ p: NSPopUpButton) { app.fillMode = p.indexOfSelectedItem == 1; app.layer.videoGravity = app.fillMode ? .resizeAspectFill : .resizeAspect }
     @objc func togglePointer(_ b: NSButton) { app.hidePointer = b.state == .on }
+    @objc func toggleForward(_ b: NSButton) { app.forwardInput = b.state == .on }
     @objc func toggleAwake(_ b: NSButton) { app.keepAwake = b.state == .on }
     @objc func pair() { app.openPairing() }
     @objc func forget(_ b: NSButton) { if let id = b.identifier?.rawValue { app.forgetID(id); fillPeers() } }

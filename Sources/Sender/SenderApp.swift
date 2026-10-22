@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Cocoa
 import Network
 import ServiceManagement
@@ -40,6 +41,7 @@ import SwiftUI
     var notifOn: Bool { get { defaults.object(forKey: "notif") as? Bool ?? true } set { defaults.set(newValue, forKey: "notif") } }
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        registerHotkey()
         item.button?.image = menuGlyph(filled: false)
         let m = NSMenu(); m.delegate = self; m.autoenablesItems = false; item.menu = m
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.tick() }
@@ -80,6 +82,17 @@ import SwiftUI
 
     // MARK: notifications
     func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification, withCompletionHandler h: @escaping (UNNotificationPresentationOptions) -> Void) { h([.banner]) }
+    /// Global ⌃⌥⌘D: pause / resume streaming from the main Mac (works even if the extra screen's input misbehaves).
+    func registerHotkey() {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, ud in
+            let a = Unmanaged<SenderApp>.fromOpaque(ud!).takeUnretainedValue()
+            DispatchQueue.main.async { a.toggleEnabled() }
+            return noErr
+        }, 1, &spec, Unmanaged.passUnretained(self).toOpaque(), nil)
+        var ref: EventHotKeyRef?
+        RegisterEventHotKey(UInt32(kVK_ANSI_D), UInt32(controlKey | optionKey | cmdKey), EventHotKeyID(signature: OSType(0x41444850), id: 1), GetApplicationEventTarget(), 0, &ref)
+    }
     var versionWarned = Set<String>()
     func checkVersion(_ v: String) {
         let mine = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
@@ -273,7 +286,7 @@ import SwiftUI
         }
         if permissionProblem { act(menu, "Open Screen Recording Settings…", #selector(openPrivacy)) }
         menu.addItem(.separator())
-        act(menu, enabled ? "Pause Streaming" : "Resume Streaming", #selector(toggleEnabled))
+        let pm = act(menu, enabled ? "Pause Streaming" : "Resume Streaming", #selector(toggleEnabled)); pm.keyEquivalent = "d"; pm.keyEquivalentModifierMask = [.control, .option, .command]
         menu.addItem(.separator())
 
         // Receivers

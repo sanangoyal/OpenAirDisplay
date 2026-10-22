@@ -36,6 +36,12 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     var activity: NSObjectProtocol?
     var peerName = ""
     var rxBytes = 0
+    // keyboard + mouse forwarding (opt-in) and connection watchdog
+    var forwardInput: Bool { get { UserDefaults.standard.bool(forKey: "rxForward") } set { UserDefaults.standard.set(newValue, forKey: "rxForward"); if streaming { newValue ? setupInput() : teardownInput() } } }
+    var inputMonitor: Any?
+    var escTimer: Timer?, escFired = false
+    var lastRx = Date()
+    var watchdog: Timer?
     lazy var settings = ReceiverSettings(self)
     var fillMode: Bool { get { UserDefaults.standard.bool(forKey: "rxFill") } set { UserDefaults.standard.set(newValue, forKey: "rxFill") } }
     var hidePointer: Bool { get { UserDefaults.standard.object(forKey: "rxHidePointer") as? Bool ?? true } set { UserDefaults.standard.set(newValue, forKey: "rxHidePointer"); if !newValue, cursorHidden { NSCursor.unhide(); cursorHidden = false } } }
@@ -142,6 +148,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func secure(_ rc: RxConn, _ t: UInt8, _ p: Data) {
         guard rc === active || !streaming else { return }
+        lastRx = Date()
         switch t {
         case MT.config: config(p)
         case MT.frame: frame(p)
@@ -272,7 +279,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         w.level = .mainMenu + 1
         w.backgroundColor = .black
         w.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
-        w.onEsc = { [weak self] in self?.pause() }
+        w.onEsc = { [weak self] in if self?.forwardInput != true { self?.pause() } }
         let v = NSView(frame: screen.frame); v.wantsLayer = true
         layer = AVSampleBufferDisplayLayer()
         layer.videoGravity = fillMode ? .resizeAspectFill : .resizeAspect; layer.frame = v.bounds
@@ -283,6 +290,13 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSApp.activate(ignoringOtherApps: true)
         w.makeKeyAndOrderFront(nil)
         win = w
+        lastRx = Date()
+        watchdog?.invalidate()
+        watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in      // fail-safe: sender vanished without closing -> give the Mac back
+            guard let self = self, self.streaming, Date().timeIntervalSince(self.lastRx) > 8 else { return }
+            self.hideWindow()
+        }
+        if forwardInput { setupInput() }
         if hidePointer, !cursorHidden { NSCursor.hide(); cursorHidden = true }
         if keepAwake { activity = ProcessInfo.processInfo.beginActivity(options: [.idleDisplaySleepDisabled, .idleSystemSleepDisabled, .userInitiated], reason: "Streaming display") }
     }
@@ -290,12 +304,86 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func hideWindow() {
         guard streaming else { return }
         streaming = false
+        teardownInput(); watchdog?.invalidate(); watchdog = nil
         item.button?.image = menuGlyph(filled: false, slashed: paused, back: true)
         active?.c.cancel(); active = nil
         win?.orderOut(nil); win = nil
         stopAudio()
         if cursorHidden { NSCursor.unhide(); cursorHidden = false }
         if let a = activity { ProcessInfo.processInfo.endActivity(a); activity = nil }
+    }
+
+    // MARK: keyboard + mouse forwarding
+    func sendInput(_ e: InputEvent) { if let rc = active, rc.authed { sendSecure(rc, MT.input, e.encode()) } }
+
+    /// Where the picture sits inside the screen (depends on Fit / Fill).
+    func videoRect() -> CGRect {
+        let b = layer.bounds
+        guard let fd = fd else { return b }
+        let d = CMVideoFormatDescriptionGetDimensions(fd)
+        guard d.width > 0, d.height > 0 else { return b }
+        let sx = b.width / CGFloat(d.width), sy = b.height / CGFloat(d.height)
+        let k = fillMode ? max(sx, sy) : min(sx, sy)
+        let w = CGFloat(d.width) * k, h = CGFloat(d.height) * k
+        return CGRect(x: b.midX - w / 2, y: b.midY - h / 2, width: w, height: h)
+    }
+
+    func norm(_ e: NSEvent) -> (Float, Float) {
+        let vr = videoRect(), p = e.locationInWindow
+        guard vr.width > 1, vr.height > 1 else { return (0, 0) }
+        let x = min(max((p.x - vr.minX) / vr.width, 0), 1), y = min(max((p.y - vr.minY) / vr.height, 0), 1)
+        return (Float(x), Float(1 - y))
+    }
+
+    func setupInput() {
+        teardownInput()
+        win?.acceptsMouseMovedEvents = true
+        let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp, .flagsChanged, .mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
+                                           .otherMouseDown, .otherMouseUp, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel]
+        inputMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] e in
+            guard let self = self, self.streaming, e.window === self.win else { return e }
+            self.forward(e); return nil
+        }
+    }
+
+    func teardownInput() {
+        if let m = inputMonitor { NSEvent.removeMonitor(m); inputMonitor = nil }
+        escTimer?.invalidate(); escTimer = nil; escFired = false
+        win?.acceptsMouseMovedEvents = false
+    }
+
+    func forward(_ e: NSEvent) {
+        let fl = UInt64(e.modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue)
+        let (x, y) = e.type == .keyDown || e.type == .keyUp || e.type == .flagsChanged ? (0, 0) : norm(e)
+        func btn(_ k: InputEvent.Kind) { sendInput(InputEvent(kind: k, code: UInt16(min(e.buttonNumber, 2)) | UInt16(max(e.clickCount, 1)) << 8, flags: fl, x: x, y: y)) }
+        switch e.type {
+        case .mouseMoved: sendInput(InputEvent(kind: .move, flags: fl, x: x, y: y))
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown: btn(.down)
+        case .leftMouseUp, .rightMouseUp, .otherMouseUp: btn(.up)
+        case .leftMouseDragged, .rightMouseDragged, .otherMouseDragged: btn(.drag)
+        case .scrollWheel:
+            let k: CGFloat = e.hasPreciseScrollingDeltas ? 1 : 10
+            sendInput(InputEvent(kind: .scroll, flags: fl, x: Float(e.scrollingDeltaX * k), y: Float(e.scrollingDeltaY * k)))
+        case .flagsChanged: sendInput(InputEvent(kind: .flags, code: e.keyCode, flags: fl))
+        case .keyDown:
+            if e.keyCode == 53 {   // Esc: tap goes to the main Mac, hold 1.5 s pauses this screen
+                if !e.isARepeat && escTimer == nil {
+                    escFired = false
+                    escTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in self?.escTimer = nil; self?.escFired = true; self?.pause() }
+                }
+                return
+            }
+            sendInput(InputEvent(kind: .keyDown, code: e.keyCode, flags: fl))
+        case .keyUp:
+            if e.keyCode == 53 {
+                if escTimer != nil { escTimer?.invalidate(); escTimer = nil
+                    sendInput(InputEvent(kind: .keyDown, code: 53, flags: fl)); sendInput(InputEvent(kind: .keyUp, code: 53, flags: fl)) }
+                escFired = false
+                return
+            }
+            sendInput(InputEvent(kind: .keyUp, code: e.keyCode, flags: fl))
+        default: break
+        }
     }
 
     func pause() {

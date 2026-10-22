@@ -19,6 +19,7 @@ Got a 5K iMac gathering dust, or a Mac mini on a spare monitor? Install the same
 - **Low latency.** Hardware H.264 on both ends, tuned for speed. Ethernet or Thunderbolt cable is best; Wi-Fi works and quality adapts automatically.
 - **Automatic link choice.** Prefers wired when both are available, with a notification to switch if a cable appears mid-session. Or force Wired or Wi-Fi only.
 - **Quality presets.** Auto, Ultra, Best, Balanced, Light, plus a "Smooth 4K 60" mode for 60 Hz panels.
+- **Keyboard and mouse from the extra screen (opt-in).** Use the extra Mac's own keyboard and mouse to control the main Mac. Tap Esc is passed through; hold Esc for 1.5 s to leave. Pause from the main Mac any time with ⌃⌥⌘D.
 - **Sound.** Optionally plays the main Mac's audio on the extra screen's speakers.
 - **Wake-on-LAN.** Wake a sleeping extra screen from the menu or automatically.
 - **One app, two roles.** Pick "Use another Mac as my display" or "Be the extra screen" at first launch. Change it any time in Settings.
@@ -88,14 +89,14 @@ Yes. Ed25519 identity keys are pinned at pairing, session keys come from X25519,
 ## Limitations
 
 - Private API; may break on new macOS releases.
-- The extra screen only shows pixels. You drive it with the main Mac's keyboard and mouse; input on the extra Mac itself is not forwarded.
+- Input forwarding is basic: system shortcuts on the extra Mac (Cmd+Tab, Mission Control) stay local, and it needs Accessibility permission on the main Mac.
 - Sender needs macOS 13+.
 - One extra screen at a time.
 - Not notarized.
 
 ## Roadmap
 
-HEVC option, hotkeys, keyboard and mouse forwarding, multiple screens, signed and notarized releases, Homebrew cask.
+HEVC option, multiple screens, signed and notarized releases, Homebrew cask.
 
 ## Contributing
 

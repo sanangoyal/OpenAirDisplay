@@ -171,12 +171,20 @@ import UserNotifications
     @AppStorage("enabled") var enabled = true
     @AppStorage("notif") var notif = true
     @AppStorage("audio") var audio = true
+    @AppStorage("acceptInput") var acceptInput = true
     @StateObject var login = Flag(SMAppService.mainApp.status == .enabled)
     var body: some View {
         Form {
             Section("Streaming") {
                 Row(title: "Stream to receiver", info: "Turn off to pause. The virtual display is removed and nothing is captured or sent.") { Toggle("", isOn: $enabled).labelsHidden() }
                 Row(title: "Send sound to receiver", info: "Plays this Mac's audio on the receiver's speakers. Uses about 1.5 Mbps.") { Toggle("", isOn: $audio).labelsHidden() }
+            }
+            Section("Extra screen input") {
+                Row(title: "Accept keyboard & mouse", info: "Lets the extra screen's keyboard and mouse control this Mac. The receiver must also turn it on (Settings › Display). Needs Accessibility permission. Pause anytime with ⌃⌥⌘D.") { Toggle("", isOn: $acceptInput).labelsHidden() }
+                Row(title: "Accessibility", info: "macOS requires this permission before an app can send keyboard and mouse events.") {
+                    HStack { Text(Injector.trusted ? "Allowed" : "Not allowed").foregroundStyle(.secondary)
+                        Button("Open…") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!) } }
+                }
             }
             Section("This Mac") {
                 Row(title: "Role", info: "This Mac sends its desktop to another Mac. Switch to make it the extra screen instead. The app restarts.") { Button("Be the extra screen…") { switchRole(to: .receiver) } }
@@ -320,7 +328,7 @@ import UserNotifications
                 Row(title: "Current link") { Text(live.connected ? "\(live.link)" + (live.iface.isEmpty ? "" : " (\(live.iface))") : "—").foregroundStyle(.secondary) }
             }
             Section("Receivers") {
-                if live.rows.isEmpty { Text("No receivers found. Open AirDisplay on the other Mac and choose “Be the extra screen”.").foregroundStyle(.secondary) }
+                if live.rows.isEmpty { Text("No receivers found. Open “AirDisplay” on the other Mac.").foregroundStyle(.secondary) }
                 ForEach(live.rows) { r in
                     HStack(spacing: 8) {
                         Circle().fill(r.online ? Color.green : Color.secondary.opacity(0.5)).frame(width: 8, height: 8)
