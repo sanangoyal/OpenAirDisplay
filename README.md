@@ -4,8 +4,8 @@
 
 # OpenAirDisplay
 
-**Use an old iMac (2015+) or any old Mac as a real 4K external display for your MacBook.**
-Wired or wireless. Free, open source, no account, no dongle.
+**Give your old iMac a second life as a 4K monitor.**
+Turn any Mac from 2015 or newer into a sharp, native-resolution second screen for your MacBook. Wired or wireless. Free and open source.
 
 [![Download](https://img.shields.io/badge/Download-latest%20release-2dd4a0?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sanangoyal/OpenAirDisplay/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
@@ -20,25 +20,27 @@ Wired or wireless. Free, open source, no account, no dongle.
 
 ## Why
 
-A 2015 iMac with a 4K Retina panel is still a beautiful screen, but Apple's Target Display Mode never covered Retina iMacs, Sidecar only works with an iPad, and paid alternatives want a dongle or a subscription.
+That 2015 iMac still has a gorgeous 4K Retina panel. But Apple's Target Display Mode never covered Retina iMacs, Sidecar only works with an iPad, and the paid options want a dongle or a subscription.
 
-OpenAirDisplay turns that iMac (or an old MacBook, or a Mac mini on a spare monitor) into a true **extended display** for your newer Mac. Not a mirror: a second desktop you drag windows onto.
+OpenAirDisplay fixes that. Your old iMac (or old MacBook, or a Mac mini on a spare monitor) becomes a true **extended display** for your newer Mac. Not a mirror: a second desktop you drag windows onto.
 
 | | |
 |---|---|
-| **Native resolution** | Matches the other Mac's panel, HiDPI included: **4096 × 2304** on a 2015 iMac 4K. |
-| **Low latency** | Hardware H.264, and HEVC where supported. About 1 ms round trip over a cable, 50 fps at 4K in our tests. |
-| **Wired or wireless** | Thunderbolt or Ethernet is best, Wi-Fi works, and it switches to a cable by itself when you plug one in. |
-| **Private** | Direct link between your two Macs. No servers, accounts or telemetry. Everything on the wire is encrypted. |
-| **AI-controllable** | Built-in [MCP server](#control-it-with-ai-mcp): ask an assistant to diagnose lag or change quality. Off by default. |
+| 🖥️ **Native resolution** | Matches the other Mac's panel, HiDPI included. That is **4096 × 2304** on a 2015 iMac 4K, so text stays crisp. |
+| ⚡ **Low latency** | Hardware H.264, and HEVC where supported. About 1 ms round trip over a cable and 50 fps at 4K in our tests. |
+| 🔌 **Wired or wireless** | Thunderbolt or Ethernet is best, Wi-Fi works, and it switches to a cable by itself the moment you plug one in. |
+| 🔒 **Private** | A direct, encrypted link between your two Macs. No servers, accounts or telemetry. |
+| 🤖 **AI-controllable** | A built-in [MCP server](#control-it-with-ai-mcp) lets an assistant diagnose lag or change quality for you. Off by default. |
 
-> **Status:** early release. Tested on a late-2015 iMac 4K (extra screen) and Apple silicon MacBooks (main Mac, and extra screen too). Expect rough edges; issues and pull requests welcome.
+> **Early release.** Tested on a late-2015 iMac 4K (extra screen) and Apple silicon MacBooks (main Mac, and extra screen too). Expect rough edges, and please [report them](https://github.com/sanangoyal/OpenAirDisplay/issues). Pull requests welcome.
 
 ## Install
 
-Download `OpenAirDisplay-<version>.dmg` from the [latest release](https://github.com/sanangoyal/OpenAirDisplay/releases/latest) and drag the app to Applications on **both** Macs.
+1. **Download** `OpenAirDisplay-<version>.dmg` from the [latest release](https://github.com/sanangoyal/OpenAirDisplay/releases/latest).
+2. **Drag the app to Applications** on **both** Macs.
+3. **Open it.** macOS blocks the first launch because the app isn't notarized yet. Go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway**.
 
-The app is not notarized yet, so macOS blocks the first launch. Open **System Settings › Privacy & Security** and click **Open Anyway** (right-click › Open no longer works on recent macOS). Or run `xattr -cr /Applications/OpenAirDisplay.app` in Terminal.
+Prefer Terminal? `xattr -cr /Applications/OpenAirDisplay.app` does the same.
 
 <details>
 <summary>Build from source instead</summary>
@@ -57,12 +59,12 @@ Tip: sign with a stable certificate so macOS keeps the Screen Recording permissi
 
 ## Set up in two minutes
 
-1. **Old Mac** (the new screen): open OpenAirDisplay, choose **Be the extra screen**.
-2. **Main Mac**: open OpenAirDisplay, choose **Use another Mac as my display**.
-3. Both show the **same 6-digit number**. If they match, click Pair on each, and allow Screen Recording when asked.
-4. A new display appears in System Settings › Displays. Arrange it and drag windows over. After this, the Macs reconnect by themselves.
+1. **Old Mac** (the new screen): open OpenAirDisplay and choose **Be the extra screen**.
+2. **Main Mac**: open OpenAirDisplay and choose **Use another Mac as my display**.
+3. Both Macs show the **same 6-digit number**. If they match, click Pair on each, and allow Screen Recording when asked.
+4. A new display appears in System Settings › Displays. Arrange it and drag windows over.
 
-Press **Esc** on the extra screen to pause and use that Mac normally.
+That's the one-time part. After this the Macs reconnect by themselves. Press **Esc** on the extra screen to pause and use that Mac normally.
 
 ## Requirements
 
@@ -71,7 +73,7 @@ Press **Esc** on the extra screen to pause and use that Mac normally.
 | **Main Mac** (sends) | 13 Ventura or later, Apple silicon or Intel | Needs Screen Recording permission |
 | **Extra screen** (receives) | 12 Monterey or later, Apple silicon or Intel | Hardware H.264 decode |
 
-Both Macs need the same network, or an Ethernet or Thunderbolt/USB bridge cable.
+Both Macs need to be on the same network, or joined by an Ethernet or Thunderbolt/USB bridge cable.
 
 <details>
 <summary>Which old Macs qualify?</summary>
@@ -92,46 +94,49 @@ macOS 12 Monterey runs on iMacs from late 2015, MacBook Air/Pro from early 2015,
 
 | | |
 |---|---|
-| **Extended, not mirrored** | A new virtual display, arranged like any monitor. |
-| **4K and beyond** | Matches the receiver's panel, including Retina HiDPI. H.264 receivers cap near 56 fps at 4096 × 2304 (hardware decoder limit); HEVC receivers do not. |
-| **HEVC when available** | Used automatically when the extra screen can decode it in hardware. Sharper at the same bit rate. |
-| **Several extra screens** | Pair more than one Mac and tick each under Receivers. Each gets its own virtual display. |
-| **Quality presets** | Auto (adapts to the link), Ultra, Best, Balanced, Light, "Smooth 4K 60". |
-| **Automatic link choice** | Prefers wired, notifies you when a cable appears, or force Wired / Wi-Fi only. |
-| **Keyboard and mouse (opt-in)** | Use the old Mac's own keyboard and mouse on your main Mac. Hold Esc 1.5 s to leave; ⌃⌥⌘D on the main Mac pauses any time. |
-| **Sound** | Optionally plays the main Mac's audio on the extra screen's speakers. |
-| **Wake-on-LAN** | Wake a sleeping extra screen from the menu, or automatically. |
-| **One app, two roles** | Pick the role at first launch; change it in Settings. |
-| **Live stats** | Frame rate, bit rate, ping, drops, capture + encode time. |
-| **Power saving** | Optional 30 fps cap on battery. |
+| 🪟 **Extended, not mirrored** | A new virtual display, arranged like any monitor. |
+| 🔍 **4K and beyond** | Matches the receiver's panel, including Retina HiDPI. H.264 receivers cap near 56 fps at 4096 × 2304 (hardware decoder limit); HEVC receivers do not. |
+| 🎞️ **HEVC when available** | Used automatically when the extra screen can decode it in hardware. Sharper at the same bit rate. |
+| 🧩 **Several extra screens** | Pair more than one Mac and tick each under Receivers. Each gets its own virtual display. |
+| 🎚️ **Quality presets** | Auto (adapts to the link), Ultra, Best, Balanced, Light, and "Smooth 4K 60". |
+| 🔀 **Automatic link choice** | Prefers wired, tells you when a cable appears, or force Wired / Wi-Fi only. |
+| ⌨️ **Keyboard and mouse (opt-in)** | Use the old Mac's own keyboard and mouse on your main Mac. Hold Esc for 1.5 s to leave; ⌃⌥⌘D on the main Mac pauses any time. |
+| 🔊 **Sound** | Optionally plays the main Mac's audio on the extra screen's speakers. |
+| ⏰ **Wake-on-LAN** | Wake a sleeping extra screen from the menu, or automatically. |
+| 📊 **Live stats** | Frame rate, bit rate, ping, drops and capture + encode time. |
+| 🔋 **Power saving** | Optional 30 fps cap on battery. |
+
+One app, two roles: pick one at first launch and change it any time in Settings.
 
 ## How it compares
 
 |  | **OpenAirDisplay** | [OpenDisplay](https://github.com/peetzweg/opendisplay) | Apple Sidecar | Luna Display | Duet Display |
 |---|---|---|---|---|---|
-| Old **Mac** as the display | **Yes** | Yes | No | Yes | Yes |
-| iPhone / iPad as the display | Coming soon | Yes | iPad only | Yes | Yes |
+| Old **Mac** as the display | ✅ | ✅ | ❌ | ✅ | ✅ |
+| iPhone / iPad as the display | Coming soon | ✅ | iPad only | ✅ | ✅ |
 | Cost | Free | Free | Built in | One-time purchase | See [vendor](https://www.duetdisplay.com) |
-| Open source | **MIT** | GPL-3.0 | No | No | No |
+| Open source | ✅ MIT | ✅ GPL-3.0 | ❌ | ❌ | ❌ |
 | Extra hardware | None | None | None | Dongle (about $89.99) | None |
 | Main Mac needs | macOS 13+ | macOS 14+ | Built in | See vendor | See vendor |
 | Receiver needs | macOS 12+ | macOS 12+ (Mac), iOS 15+ | n/a | macOS 10.13+ | macOS 10.13 to 10.15 (Intel app) |
-| HEVC | **Yes** | Planned | n/a | n/a | n/a |
-| Keyboard, mouse and sound from the extra Mac | **Yes** | Not yet | n/a | n/a | n/a |
-| AI / MCP control | **Built in** (opt-in) | Not documented | No | No | No |
+| HEVC | ✅ | Planned | n/a | n/a | n/a |
+| Keyboard, mouse and sound from the extra Mac | ✅ | Not yet | n/a | n/a | n/a |
+| AI / MCP control | ✅ Built in (opt-in) | Not documented | ❌ | ❌ | ❌ |
 | Account / servers | None | None | Apple Account | Vendor apps | Vendor apps |
 
 <sub>Checked October 2026 from [OpenDisplay's README](https://github.com/peetzweg/opendisplay), Apple's [Sidecar page](https://support.apple.com/en-us/102597), the [Luna Display store](https://shop.astropad.com/products/luna-display) and [duetdisplay.com](https://www.duetdisplay.com). Products change; [open an issue](https://github.com/sanangoyal/OpenAirDisplay/issues) if something is out of date. Each has strengths we lack: OpenDisplay, Luna and Duet reach iPhone or iPad today, Duet also Windows and Android, and Sidecar is seamless with iPad. "n/a": not applicable or not published.</sub>
 
 ## Control it with AI (MCP)
 
-OpenAirDisplay speaks [MCP](https://modelcontextprotocol.io), so AI assistants and scripts can control it without menus. **Off by default:** turn on *Settings › General › Allow AI agents & scripts*, then use the copy buttons there.
+Ask your AI assistant "why is my second screen laggy?" and get a real answer. OpenAirDisplay speaks [MCP](https://modelcontextprotocol.io), so assistants and scripts can check status, run diagnostics and change quality without menus.
+
+It is **off by default.** Turn on *Settings › General › Allow AI agents & scripts*, then use the copy buttons there. For Claude Code:
 
 ```sh
 claude mcp add openairdisplay -- /Applications/OpenAirDisplay.app/Contents/MacOS/OpenAirDisplay --mcp
 ```
 
-Ask things like "why is my second screen laggy?", "switch to the wired link", or "drop quality to light".
+Then try "switch to the wired link" or "drop quality to light".
 
 <details>
 <summary>Other MCP clients, tool list and security</summary>
@@ -259,18 +264,20 @@ No accounts, analytics, telemetry or servers, and no internet connections. Video
 
 | Platform | Status |
 |---|---|
-| macOS to macOS | **Available** |
-| iPhone and iPad as the display | Coming soon |
-| Android phones and tablets | Coming soon |
-| TV | Coming soon |
-| Windows | Coming soon |
-| Notarized releases, Homebrew cask | Planned |
+| macOS to macOS | ✅ Available |
+| iPhone and iPad as the display | 🔜 Coming soon |
+| Android phones and tablets | 🔜 Coming soon |
+| TV | 🔜 Coming soon |
+| Windows | 🔜 Coming soon |
+| Notarized releases, Homebrew cask | 🗓️ Planned |
 
 Want to build one of these? Open an issue to coordinate first.
 
 ## Contributing
 
 Issues and pull requests welcome: [CONTRIBUTING.md](CONTRIBUTING.md). Changes: [CHANGELOG.md](CHANGELOG.md). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+If OpenAirDisplay saved your old iMac from the drawer, a ⭐ helps others find it.
 
 ---
 
