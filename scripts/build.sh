@@ -1,19 +1,19 @@
 #!/bin/zsh
-# Builds a universal (Intel + Apple silicon) AirDisplay.app for macOS 12+.
+# Builds a universal (Intel + Apple silicon) OpenAirDisplay.app for macOS 12+.
 # Needs only the Xcode Command Line Tools (xcode-select --install).
 #
 # Usage:  scripts/build.sh [--install]
 # Env:    SIGN_ID   codesign identity. Default "-" (ad-hoc). Use a stable certificate
-#                   (e.g. a self-made "AirDisplay Local Signing") so macOS keeps the
+#                   (e.g. a self-made "OpenAirDisplay Local Signing") so macOS keeps the
 #                   Screen Recording permission between rebuilds.
 set -e
 cd "$(dirname $0)/.."
-APP="AirDisplay.app"; OUT="build"; SIGN_ID="${SIGN_ID:--}"
+APP="OpenAirDisplay.app"; OUT="build"; SIGN_ID="${SIGN_ID:--}"
 rm -rf "$OUT"; mkdir -p "$OUT/$APP/Contents/MacOS" "$OUT/$APP/Contents/Resources" "$OUT/tmp"
 
 SRC=(Sources/main.swift Sources/Role.swift Sources/Receiver/*.swift Sources/Sender/*.swift Sources/Shared/*.swift)
 FW=(-framework Cocoa -framework AVFoundation -framework VideoToolbox -framework Network
-    -framework UserNotifications -framework SwiftUI -framework ServiceManagement -framework Carbon
+    -framework UserNotifications -framework SwiftUI -framework ServiceManagement -framework Carbon -framework IOKit
     -Xlinker -weak_framework -Xlinker ScreenCaptureKit -Xlinker -weak_framework -Xlinker Charts)
 
 # The Command Line Tools ship no x86_64 Swift back-deployment shims; provide empty ones.
@@ -22,10 +22,10 @@ clang -target x86_64-apple-macos12.0 -c "$OUT/tmp/stub.c" -o "$OUT/tmp/stub-x86.
 
 swiftc -O -target x86_64-apple-macos12.0 -import-objc-header Sources/bridge.h $SRC "$OUT/tmp/stub-x86.o" -o "$OUT/tmp/x86" $FW
 swiftc -O -target arm64-apple-macos12.0  -import-objc-header Sources/bridge.h $SRC -o "$OUT/tmp/arm" $FW
-lipo -create "$OUT/tmp/x86" "$OUT/tmp/arm" -output "$OUT/$APP/Contents/MacOS/AirDisplay"
+lipo -create "$OUT/tmp/x86" "$OUT/tmp/arm" -output "$OUT/$APP/Contents/MacOS/OpenAirDisplay"
 cp Sources/Info.plist "$OUT/$APP/Contents/Info.plist"
 cp branding/AppIcon.icns "$OUT/$APP/Contents/Resources/"
-codesign --force -s "$SIGN_ID" --identifier com.sanan.airdisplay "$OUT/$APP"
+codesign --force -s "$SIGN_ID" --identifier com.sanan.openairdisplay "$OUT/$APP"
 rm -rf "$OUT/tmp"
 echo "Built $OUT/$APP"
 

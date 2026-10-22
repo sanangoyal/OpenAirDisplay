@@ -2,6 +2,7 @@ import Cocoa
 import ScreenCaptureKit
 import VideoToolbox
 import Network
+import IOKit.ps
 import AudioToolbox
 import CoreMedia
 
@@ -17,9 +18,19 @@ let autoLadder = 4
 let defaults = UserDefaults.standard
 func even(_ v: Double) -> Int { max(2, Int(v) & ~1) }
 /// H.264 Level 5.2 allows 2,073,600 macroblocks/s: cap fps so big frames stay at Level <= 5.2 (older hardware decoders reject Level 6)
+/// True while this Mac runs on battery (cached for 5 s). Used by the optional "save power on battery" frame-rate cap.
+var onBattery: Bool {
+    struct C { static var at = Date.distantPast, v = false }
+    if Date().timeIntervalSince(C.at) > 5 {
+        C.at = Date()
+        if let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() { C.v = (IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() as String?) == kIOPSBatteryPowerValue }
+    }
+    return C.v
+}
 func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
     let cap = defaults.integer(forKey: "fpsCap")
-    let want = cap > 0 ? min(f, cap) : f
+    var want = cap > 0 ? min(f, cap) : f
+    if defaults.bool(forKey: "batteryCap") && onBattery { want = min(want, 30) }
     return hevc ? want : min(want, 2_073_600 / (((w + 15) / 16) * ((h + 15) / 16)))   // HEVC has no such limit at these sizes
 }
 @available(macOS 13.0, *) func applyColor(_ cfg: SCStreamConfiguration) {
@@ -72,6 +83,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
     var onLive: (() -> Void)?
     var onPaired: ((Peer) -> Void)?
     var fps = 0.0, mbps = 0.0
+    var pipeMs = 0.0   // capture delivery + encode time, smoothed (what this Mac adds before the network)
     var dropped = 0, startedAt = Date(), linkType = "…", iface = "", rttMs = 0.0
     var rxFrames = 0, lastRx = 0, rxFps = 0.0
     var statTimer: Timer?, idleTimer: Timer?
@@ -388,9 +400,13 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
         var props: CFDictionary? = nil
         if firstFrame { props = [kVTEncodeFrameOptionKey_ForceKeyFrame: true] as CFDictionary; firstFrame = false }
         lastEnc = Date()
+        let t0 = DispatchTime.now().uptimeNanoseconds
+        let age = CMTimeGetSeconds(CMTimeSubtract(CMClockGetTime(CMClockGetHostTimeClock()), pts)) * 1000   // frame waited this long before we saw it
         VTCompressionSessionEncodeFrame(e, imageBuffer: pb, presentationTimeStamp: pts, duration: .invalid,
             frameProperties: props, infoFlagsOut: nil) { [weak self] status, _, sb in
             guard let self = self, status == noErr, let sb = sb else { return }
+            let ms = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1e6 + (age.isFinite ? min(max(age, 0), 100) : 0)
+            self.pipeMs = self.pipeMs * 0.9 + ms * 0.1
             var key = true
             if let a = CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: false) as? [[CFString: Any]],
                let f = a.first, (f[kCMSampleAttachmentKey_NotSync] as? Bool) == true { key = false }

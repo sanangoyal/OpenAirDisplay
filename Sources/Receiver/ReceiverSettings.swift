@@ -46,7 +46,7 @@ final class ReceiverSettings: NSObject, NSWindowDelegate {
     func show() {
         if let w = win { reload(); center(w); NSApp.activate(ignoringOtherApps: true); w.makeKeyAndOrderFront(nil); startTimer(); return }
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 400), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-        w.title = "AirDisplay Settings"; w.isReleasedWhenClosed = false; w.delegate = self
+        w.title = "OpenAirDisplay Settings"; w.isReleasedWhenClosed = false; w.delegate = self
         let t = NSTabView(frame: w.contentView!.bounds); t.autoresizingMask = [.width, .height]
         tabs = t; w.contentView!.addSubview(t); win = w
         build(); center(w)
@@ -106,7 +106,7 @@ final class ReceiverSettings: NSObject, NSWindowDelegate {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?", b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         let copy = NSButton(title: "Copy diagnostics", target: self, action: #selector(copyDiag))
         let reset = NSButton(title: "Show role chooser at next launch…", target: self, action: #selector(resetRole))
-        let ab: [NSView] = [text("AirDisplay", size: 20, weight: .bold), row("Version", text("\(v) (\(b))")), row("Role", text("Extra screen")),
+        let ab: [NSView] = [text("OpenAirDisplay", size: 20, weight: .bold), row("Version", text("\(v) (\(b))")), row("Role", text("Extra screen")),
             row("Mac", text(hardwareModel(), color: .secondaryLabelColor)), row("macOS", text(osVersionString(), color: .secondaryLabelColor)),
             row("", copy), row("", reset),
             row("Made by", text("Sanan Goyal · sanangoyal.com", color: .secondaryLabelColor)),
@@ -161,7 +161,7 @@ final class ReceiverSettings: NSObject, NSWindowDelegate {
     }
     @objc func copyDiag() {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-        let s = "AirDisplay \(v) · receiver · \(hardwareModel()) · macOS \(osVersionString()) · paired \(app.keys.peers.count) · streaming \(app.streaming) · \(String(format: "%.0f fps %.1f Mbps", fps, mbps))"
+        let s = "OpenAirDisplay \(v) · receiver · \(hardwareModel()) · macOS \(osVersionString()) · paired \(app.keys.peers.count) · streaming \(app.streaming) · \(String(format: "%.0f fps %.1f Mbps", fps, mbps))"
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(s, forType: .string)
     }
 }

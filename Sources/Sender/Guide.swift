@@ -120,7 +120,7 @@ import Cocoa
         if let w = win { w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
         let W: CGFloat = 540
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: 460), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        w.title = "AirDisplay Setup"; w.isReleasedWhenClosed = false; w.delegate = self
+        w.title = "OpenAirDisplay Setup"; w.isReleasedWhenClosed = false; w.delegate = self
 
         let icon = NSImageView(image: NSApp.applicationIconImage)
         icon.widthAnchor.constraint(equalToConstant: 48).isActive = true
@@ -139,7 +139,7 @@ import Cocoa
 
         cards = [
             StepCard(number: 1, heading: "Install on both Macs", info:
-                "Both Macs run the same app.\n\n• This Mac: “AirDisplay” (you're running it).\n• Other Mac (the screen you want to use): copy this same “AirDisplay” app to its Applications folder and open it. When asked, choose “Be the extra screen for another Mac”. Use “Show app” below to find the file to copy.\n\nBoth Macs must be on the same network, or joined by an Ethernet or Thunderbolt cable."),
+                "Both Macs run the same app.\n\n• This Mac: “OpenAirDisplay” (you're running it).\n• Other Mac (the screen you want to use): copy this same “OpenAirDisplay” app to its Applications folder and open it. When asked, choose “Be the extra screen for another Mac”. Use “Show app” below to find the file to copy.\n\nBoth Macs must be on the same network, or joined by an Ethernet or Thunderbolt cable."),
             StepCard(number: 2, heading: "Allow Screen Recording", info:
                 "macOS requires this permission before an app can capture a display.\n\nThe app only captures its own virtual display. Nothing is stored, and everything sent to the other Mac is encrypted.\n\nIf macOS also asks about Local Network access, click Allow: it is how the two Macs find each other."),
             StepCard(number: 3, heading: "Pair the two Macs", info:
@@ -181,9 +181,9 @@ import Cocoa
         let cur = ok.firstIndex(of: false) ?? 4
         func st(_ i: Int) -> StepState { ok[i] ? .done : (i == cur ? .current : .pending) }
 
-        cards[0].set(names.isEmpty ? "This Mac ready. Waiting for the other Mac to open AirDisplay as the extra screen…" : "Both Macs ready. Found \(names.joined(separator: ", "))",
+        cards[0].set(names.isEmpty ? "This Mac ready. Waiting for the other Mac to open OpenAirDisplay as the extra screen…" : "Both Macs ready. Found \(names.joined(separator: ", "))",
                      button: names.isEmpty && receiverApp() != nil ? "Show app to copy" : nil, state: st(0))
-        cards[1].set(perm ? "Allowed" : "Click Allow, then switch on “AirDisplay” in the list that opens.", button: "Allow…", state: st(1))
+        cards[1].set(perm ? "Allowed" : "Click Allow, then switch on “OpenAirDisplay” in the list that opens.", button: "Allow…", state: st(1))
         if let p = paired { cards[2].set("Paired with \(p.name)", state: st(2)) }
         else if let f = unpaired { cards[2].set("\(f.name) is ready. Click Pair, then check both Macs show the same number.", button: "Pair…", state: st(2)) }
         else { cards[2].set("Waiting for the other Mac to appear.", state: st(2)) }

@@ -1,4 +1,4 @@
-# AirDisplay
+# OpenAirDisplay
 
 **Turn an old Mac into a real second screen for your new one.** Free, open source, no account, no dongle, no subscription.
 
@@ -18,7 +18,7 @@ Got a 5K iMac gathering dust, or a Mac mini on a spare monitor? Install the same
 - **Native resolution.** The virtual display matches the other Mac's panel, HiDPI included (4096×2304 on a 4K iMac).
 - **Low latency.** Hardware H.264 on both ends, tuned for speed. Ethernet or Thunderbolt cable is best; Wi-Fi works and quality adapts automatically.
 - **Automatic link choice.** Prefers wired when both are available, with a notification to switch if a cable appears mid-session. Or force Wired or Wi-Fi only.
-- **HEVC when available.** If the extra screen can decode HEVC in hardware (newer Macs), AirDisplay uses it automatically: sharper at the same bit rate and no 4K 60 fps cap. Older Macs stay on H.264.
+- **HEVC when available.** If the extra screen can decode HEVC in hardware (newer Macs), OpenAirDisplay uses it automatically: sharper at the same bit rate and no 4K 60 fps cap. Older Macs stay on H.264.
 - **Several extra screens at once.** Pair more than one Mac and tick each one under Receivers; every one gets its own virtual display. Arrange them in System Settings › Displays. Sound goes to the first one.
 - **Quality presets.** Auto, Ultra, Best, Balanced, Light, plus a "Smooth 4K 60" mode for 60 Hz panels.
 - **Keyboard and mouse from the extra screen (opt-in).** Use the extra Mac's own keyboard and mouse to control the main Mac. Tap Esc is passed through; hold Esc for 1.5 s to leave. Pause from the main Mac any time with ⌃⌥⌘D.
@@ -45,11 +45,11 @@ Build from source (needs only Xcode Command Line Tools):
 
 ```sh
 xcode-select --install          # once
-git clone https://github.com/<you>/AirDisplay && cd AirDisplay
+git clone https://github.com/<you>/OpenAirDisplay && cd OpenAirDisplay
 scripts/build.sh --install      # builds a universal app into ~/Applications
 ```
 
-Copy `~/Applications/AirDisplay.app` to the other Mac too (AirDrop, USB stick, anything). Because it is not notarized, macOS may block the first launch of the copy. On recent macOS, right-click › Open no longer works for this: open System Settings › Privacy & Security, scroll down and click **Open Anyway**, or run `xattr -cr AirDisplay.app`.
+Copy `~/Applications/OpenAirDisplay.app` to the other Mac too (AirDrop, USB stick, anything). Because it is not notarized, macOS may block the first launch of the copy. On recent macOS, right-click › Open no longer works for this: open System Settings › Privacy & Security, scroll down and click **Open Anyway**, or run `xattr -cr OpenAirDisplay.app`.
 
 Tip: sign with a stable certificate so macOS keeps the Screen Recording permission across rebuilds:
 
@@ -59,8 +59,8 @@ SIGN_ID="My Local Signing" scripts/build.sh --install
 
 ## Set up
 
-1. Open AirDisplay on the **extra screen** Mac and choose **Be the extra screen**. It says it is ready to pair.
-2. Open AirDisplay on your **main Mac** and choose **Use another Mac as my display**. It asks “Pair with …?”. Click Pair, check that both Macs show the same 6-digit number, and click Pair on each. Allow Screen Recording when asked.
+1. Open OpenAirDisplay on the **extra screen** Mac and choose **Be the extra screen**. It says it is ready to pair.
+2. Open OpenAirDisplay on your **main Mac** and choose **Use another Mac as my display**. It asks “Pair with …?”. Click Pair, check that both Macs show the same 6-digit number, and click Pair on each. Allow Screen Recording when asked.
 3. Done. After the first pairing, they reconnect by themselves.
 
 Press **Esc** on the extra screen to pause and use that Mac normally.
@@ -74,7 +74,7 @@ The main Mac creates a virtual display (via the private `CGVirtualDisplay` API),
 It relies on a private API, which the App Store does not allow. It may break with a future macOS update.
 
 **Why the purple recording indicator on my main Mac?**
-macOS shows it whenever an app captures the screen. AirDisplay only captures its own virtual display, and nothing is stored.
+macOS shows it whenever an app captures the screen. OpenAirDisplay only captures its own virtual display, and nothing is stored.
 
 **Wi-Fi is stuttery.**
 Use a cable if you can. Also, with AirDrop set to "Everyone", macOS periodically scans and can cause hitches; set it to Contacts Only. If macOS asked for Local Network access and you missed it, enable it in System Settings › Privacy & Security.
@@ -99,21 +99,21 @@ Yes. Ed25519 identity keys are pinned at pairing, session keys come from X25519,
 
 ## AI agents & scripts (MCP)
 
-AirDisplay can be driven by AI assistants and scripts. It is **off by default**: turn on *Settings › General › Allow AI agents & scripts*, then use the two copy buttons there.
+OpenAirDisplay can be driven by AI assistants and scripts. It is **off by default**: turn on *Settings › General › Allow AI agents & scripts*, then use the two copy buttons there.
 
 ```
-claude mcp add airdisplay -- /Applications/AirDisplay.app/Contents/MacOS/AirDisplay --mcp
+claude mcp add openairdisplay -- /Applications/OpenAirDisplay.app/Contents/MacOS/OpenAirDisplay --mcp
 ```
 
 or in any MCP client's config:
 
 ```json
-{ "mcpServers": { "airdisplay": { "command": "/Applications/AirDisplay.app/Contents/MacOS/AirDisplay", "args": ["--mcp"] } } }
+{ "mcpServers": { "openairdisplay": { "command": "/Applications/OpenAirDisplay.app/Contents/MacOS/OpenAirDisplay", "args": ["--mcp"] } } }
 ```
 
-Tools: `get_status`, `list_receivers`, `use_receiver`, `stop_using_receiver`, `pause_streaming`, `resume_streaming`, `set_quality`, `set_link`, `restart_stream`, and `diagnose` (health report with findings and suggested fixes). Scripts can use `AirDisplay --ctl <tool> '{"json":"args"}'`.
+Tools: `get_status`, `list_receivers`, `use_receiver`, `stop_using_receiver`, `pause_streaming`, `resume_streaming`, `set_quality`, `set_link`, `restart_stream`, and `diagnose` (health report with findings and suggested fixes). Scripts can use `OpenAirDisplay --ctl <tool> '{"json":"args"}'`.
 
-Security: the app listens on a Unix socket in `~/Library/Application Support/AirDisplay/` (mode 0600, peer UID checked), never on the network. Pairing a new Mac, keyboard/mouse forwarding, the role and reset are not exposed; they always need the person.
+Security: the app listens on a Unix socket in `~/Library/Application Support/OpenAirDisplay/` (mode 0600, peer UID checked), never on the network. Pairing a new Mac, keyboard/mouse forwarding, the role and reset are not exposed; they always need the person.
 
 ## Privacy
 
@@ -137,7 +137,7 @@ Issues and pull requests welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Change
 
 MIT. See [LICENSE](LICENSE). The software is provided "as is", without warranty of any kind, and you use it at your own risk; the author is not liable for any damage, data loss or hardware problems arising from its use.
 
-AirDisplay is not affiliated with or endorsed by Apple Inc. Mac, macOS, iMac, MacBook, Thunderbolt and AirDrop are trademarks of Apple Inc. It is also unrelated to other products called "Air Display".
+OpenAirDisplay is not affiliated with or endorsed by Apple Inc. Mac, macOS, iMac, MacBook, Thunderbolt and AirDrop are trademarks of Apple Inc. It is also unrelated to other products called "Air Display".
 
 ## Credits
 

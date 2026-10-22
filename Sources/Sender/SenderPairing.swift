@@ -18,7 +18,7 @@ import Network
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             let a = NSAlert(); a.messageText = "Pair with \(f.name)?"
-            a.informativeText = userAsked ? "Make sure AirDisplay is open on \(f.name) and set to “Be the extra screen”." : "\(f.name) is waiting to be paired. Click Pair, then check that both Macs show the same number."
+            a.informativeText = userAsked ? "Make sure OpenAirDisplay is open on \(f.name) and set to “Be the extra screen”." : "\(f.name) is waiting to be paired. Click Pair, then check that both Macs show the same number."
             a.addButton(withTitle: "Pair"); a.addButton(withTitle: "Not now")
             NSApp.activate(ignoringOtherApps: true)
             let go = a.runModal() == .alertFirstButtonReturn

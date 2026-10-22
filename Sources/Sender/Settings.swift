@@ -20,6 +20,7 @@ import UserNotifications
     @Published var target = 0
     @Published var mbps = 0.0
     @Published var rtt = 0.0
+    @Published var pipe = 0.0
     @Published var rxFps = 0.0
     @Published var gb = 0.0
     @Published var dropped = 0
@@ -189,6 +190,7 @@ import UserNotifications
     @AppStorage("enabled") var enabled = true
     @AppStorage("notif") var notif = true
     @AppStorage("audio") var audio = true
+    @AppStorage("batteryCap") var batteryCap = false
     @AppStorage("acceptInput") var acceptInput = true
     @AppStorage("agentControl") var agentControl = false
     @StateObject var login = Flag(SMAppService.mainApp.status == .enabled)
@@ -196,6 +198,7 @@ import UserNotifications
         Form {
             Section("Streaming") {
                 Row(title: "Stream to receiver", info: "Turn off to pause. The virtual display is removed and nothing is captured or sent.") { Toggle("", isOn: $enabled).labelsHidden() }
+                Row(title: "Save power on battery", info: "Caps the frame rate at 30 fps while this Mac runs on battery, so the encoder and Wi-Fi work less. Back to normal on power. Off by default.") { Toggle("", isOn: $batteryCap).labelsHidden() }
                 Row(title: "Send sound to receiver", info: "Plays this Mac's audio on the receiver's speakers. Uses about 1.5 Mbps.") { Toggle("", isOn: $audio).labelsHidden() }
             }
             Section("Extra screen input") {
@@ -209,10 +212,10 @@ import UserNotifications
                 Row(title: "Allow AI agents & scripts", info: "Lets AI assistants and scripts on this Mac check status, run diagnostics, and change quality, link and receivers. Local only, this user only. Pairing new Macs, keyboard/mouse forwarding and the role always stay manual.") { Toggle("", isOn: $agentControl).labelsHidden() }
                 if agentControl {
                     AgentActivity()
-                    Row(title: "Connect an agent", info: "Adds AirDisplay as an MCP server. Claude Code: run the copied command in a terminal. Other apps (Claude desktop, Cursor…): paste the JSON into their MCP settings.") {
+                    Row(title: "Connect an agent", info: "Adds OpenAirDisplay as an MCP server. Claude Code: run the copied command in a terminal. Other apps (Claude desktop, Cursor…): paste the JSON into their MCP settings.") {
                         HStack {
-                            Button("Copy Claude Code command") { copyText("claude mcp add airdisplay -- \"" + (Bundle.main.executablePath ?? "AirDisplay") + "\" --mcp") }
-                            Button("Copy JSON config") { copyText("{\n  \"mcpServers\": {\n    \"airdisplay\": { \"command\": \"" + (Bundle.main.executablePath ?? "AirDisplay") + "\", \"args\": [\"--mcp\"] }\n  }\n}") }
+                            Button("Copy Claude Code command") { copyText("claude mcp add openairdisplay -- \"" + (Bundle.main.executablePath ?? "OpenAirDisplay") + "\" --mcp") }
+                            Button("Copy JSON config") { copyText("{\n  \"mcpServers\": {\n    \"openairdisplay\": { \"command\": \"" + (Bundle.main.executablePath ?? "OpenAirDisplay") + "\", \"args\": [\"--mcp\"] }\n  }\n}") }
                         }
                     }
                 }
@@ -221,7 +224,7 @@ import UserNotifications
                 Row(title: "Role", info: "This Mac sends its desktop to another Mac. Switch to make it the extra screen instead. The app restarts.") { Button("Be the extra screen…") { switchRole(to: .receiver) } }
             }
             Section("App") {
-                Row(title: "Launch at login", info: "Starts AirDisplay automatically so the receiver connects as soon as you log in.") { Toggle("", isOn: $login.on).labelsHidden() }
+                Row(title: "Launch at login", info: "Starts OpenAirDisplay automatically so the receiver connects as soon as you log in.") { Toggle("", isOn: $login.on).labelsHidden() }
                 Row(title: "Notifications", info: "Banners when the display connects, disconnects, falls back to Wi-Fi, or a cable becomes available.") { Toggle("", isOn: $notif).labelsHidden() }
             }
             Section("Help") {
@@ -254,7 +257,7 @@ import UserNotifications
         if let t = pane { nav.pane = t }
         if win == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: Root(live: app.live, nav: nav, app: app)))
-            w.title = "AirDisplay Settings"
+            w.title = "OpenAirDisplay Settings"
             w.styleMask = NSWindow.StyleMask([.titled, .closable, .miniaturizable, .resizable])
             w.setContentSize(NSSize(width: 820, height: 580)); w.isReleasedWhenClosed = false; w.delegate = self
             win = w

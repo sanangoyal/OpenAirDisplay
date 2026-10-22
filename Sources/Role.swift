@@ -72,7 +72,7 @@ final class RolePickerApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 420), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        w.title = "AirDisplay"; w.isReleasedWhenClosed = false; w.delegate = self
+        w.title = "OpenAirDisplay"; w.isReleasedWhenClosed = false; w.delegate = self
 
         let h1 = NSTextField(labelWithString: "What will this Mac do?"); h1.font = .systemFont(ofSize: 22, weight: .bold)
         let h2 = NSTextField(wrappingLabelWithString: "Install this same app on both Macs, then pick one role on each.")

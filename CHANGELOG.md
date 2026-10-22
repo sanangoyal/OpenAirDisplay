@@ -2,10 +2,12 @@
 
 ## 3.2 (unreleased)
 
-- Agent control: local MCP server (`AirDisplay --mcp`), `--ctl` command line, and a `diagnose` health report. Off by default; activity log in Settings.
+- Agent control: local MCP server (`OpenAirDisplay --mcp`), `--ctl` command line, and a `diagnose` health report. Off by default; activity log in Settings.
 - Per-receiver quality ladders (a slow extra screen no longer drags the others down).
 - Only one copy of the app can run per Mac (two copies used to fight over the receiver).
 - About: credits, privacy and legal notes. Added SECURITY.md, CONTRIBUTING.md, tests and CI.
+- New name: OpenAirDisplay.
+- Stats: capture + encode time and an estimate of total delay to the other Mac. Optional "Save power on battery" (30 fps cap, off by default).
 - Code split into smaller files; compiler warnings fixed.
 
 ## 3.1

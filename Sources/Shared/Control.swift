@@ -1,9 +1,9 @@
 import Foundation
 
 /// Agent / script control. The running app listens on a private Unix socket (off by default, Settings › General);
-/// `AirDisplay --mcp` is a stdio MCP server that forwards tool calls to it, `AirDisplay --ctl <command> [json]` is a plain CLI.
+/// `OpenAirDisplay --mcp` is a stdio MCP server that forwards tool calls to it, `OpenAirDisplay --ctl <command> [json]` is a plain CLI.
 enum Ctl {
-    static var dir: String { NSHomeDirectory() + "/Library/Application Support/AirDisplay" }
+    static var dir: String { NSHomeDirectory() + "/Library/Application Support/OpenAirDisplay" }
     static var sockPath: String { dir + "/control.sock" }
 
     static func unixAddr(_ path: String) -> sockaddr_un {
@@ -32,7 +32,7 @@ enum Ctl {
 
     /// One request/response round trip to the running app.
     static func call(_ cmd: String, _ args: [String: Any] = [:]) -> [String: Any] {
-        let off = "AirDisplay is not running here, or “Allow AI agents & scripts” is off (AirDisplay › Settings › General). Only the main-Mac role can be controlled."
+        let off = "OpenAirDisplay is not running here, or “Allow AI agents & scripts” is off (OpenAirDisplay › Settings › General). Only the main-Mac role can be controlled."
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return ["ok": false, "error": "socket failed"] }
         defer { close(fd) }
@@ -46,7 +46,7 @@ enum Ctl {
         guard var data = try? JSONSerialization.data(withJSONObject: req) else { return ["ok": false, "error": "bad arguments"] }
         data.append(10)
         writeAll(fd, data)
-        guard let resp = readLine(fd), let j = try? JSONSerialization.jsonObject(with: resp) as? [String: Any] else { return ["ok": false, "error": "no answer from AirDisplay"] }
+        guard let resp = readLine(fd), let j = try? JSONSerialization.jsonObject(with: resp) as? [String: Any] else { return ["ok": false, "error": "no answer from OpenAirDisplay"] }
         return j
     }
 }
@@ -87,8 +87,8 @@ func runMCP() {
         switch method {
         case "initialize":
             let want = (m["params"] as? [String: Any])?["protocolVersion"] as? String ?? "2025-06-18"
-            reply(id, result: ["protocolVersion": want, "capabilities": ["tools": [String: Any]()], "serverInfo": ["name": "airdisplay", "version": ver],
-                               "instructions": "Controls the AirDisplay app on this Mac (the main Mac that sends its desktop to a receiver Mac). Start with diagnose when something is wrong."] as [String: Any])
+            reply(id, result: ["protocolVersion": want, "capabilities": ["tools": [String: Any]()], "serverInfo": ["name": "openairdisplay", "version": ver],
+                               "instructions": "Controls the OpenAirDisplay app on this Mac (the main Mac that sends its desktop to a receiver Mac). Start with diagnose when something is wrong."] as [String: Any])
         case "ping": reply(id, result: [String: Any]())
         case "tools/list":
             let list: [[String: Any]] = tools.map { t in
@@ -112,7 +112,7 @@ func runMCP() {
     }
 }
 
-/// `AirDisplay --ctl status` etc. for scripts and testing.
+/// `OpenAirDisplay --ctl status` etc. for scripts and testing.
 func runCtl(_ args: [String]) {
     guard let cmd = args.first else { print("usage: --ctl <command> [json-arguments]"); return }
     var a: [String: Any] = [:]

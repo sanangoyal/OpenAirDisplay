@@ -130,7 +130,7 @@ import UserNotifications
                 Row(title: "Current link") { Text(live.connected ? "\(live.link)" + (live.iface.isEmpty ? "" : " (\(live.iface))") : "—").foregroundStyle(.secondary) }
             }
             Section("Receivers · use several at once") {
-                if live.rows.isEmpty { Text("No receivers found. Open “AirDisplay” on the other Mac.").foregroundStyle(.secondary) }
+                if live.rows.isEmpty { Text("No receivers found. Open “OpenAirDisplay” on the other Mac.").foregroundStyle(.secondary) }
                 ForEach(live.rows) { r in
                     HStack(spacing: 8) {
                         Circle().fill(r.online ? Color.green : Color.secondary.opacity(0.5)).frame(width: 8, height: 8)
@@ -237,6 +237,7 @@ import UserNotifications
                     Tile(title: "Frame rate", value: live.connected ? "\(Int(live.fps.rounded())) fps" : "—", sub: live.connected ? "target \(live.target) · receiver \(Int(live.rxFps.rounded()))" : "")
                     Tile(title: "Bitrate", value: live.connected ? String(format: "%.1f Mbps", live.mbps) : "—", sub: live.connected ? String(format: "%.2f GB sent", live.gb) : "")
                     Tile(title: "Latency", value: live.connected ? String(format: "%.1f ms", live.rtt) : "—", sub: live.connected ? "round trip" : "")
+                    Tile(title: "Capture + encode", value: live.connected ? String(format: "%.1f ms", live.pipe) : "—", sub: live.connected ? String(format: "≈ %.0f ms to the other Mac's screen", live.pipe + live.rtt / 2) : "")
                     Tile(title: "Dropped frames", value: live.connected ? "\(live.dropped)" : "—", sub: "this session")
                     Tile(title: "Link", value: live.connected ? live.link : "—", sub: live.iface)
                     Tile(title: "Session", value: live.connected ? live.uptime : "—", sub: live.connected ? live.receiver : "")
@@ -267,7 +268,7 @@ import UserNotifications
                 HStack(spacing: 16) {
                     Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 64, height: 64)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("AirDisplay").font(.title2.bold())
+                        Text("OpenAirDisplay").font(.title2.bold())
                         Text("Version \(version) (\(build))").foregroundStyle(.secondary)
                         Text("Use another Mac as a wired, low-latency display.").font(.callout).foregroundStyle(.secondary)
                         HStack(spacing: 4) { Text("Made by Sanan Goyal ·").foregroundStyle(.secondary); Link("sanangoyal.com", destination: URL(string: "https://sanangoyal.com")!) }.font(.callout)

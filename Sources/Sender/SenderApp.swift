@@ -15,7 +15,7 @@ final class Ladder {
 
 @available(macOS 13.0, *) final class SenderApp: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    let keys = Keys(appDir: "AirDisplay")
+    let keys = Keys(appDir: "OpenAirDisplay")
     let myName = Host.current().localizedName ?? "MacBook"
     var session: Session?                 // primary receiver (targetID)
     var extras: [String: Session] = [:]   // additional receivers used at the same time
@@ -115,7 +115,7 @@ final class Ladder {
         let mine = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         func mm(_ x: String) -> String { x.split(separator: ".").prefix(2).joined(separator: ".") }
         if v == "older" || mm(v) != mm(mine), versionWarned.insert(v).inserted {
-            notify("Update the other Mac", "It runs AirDisplay \(v == "older" ? "(older version)" : v); this Mac runs \(mine). Copy the same app to both Macs.")
+            notify("Update the other Mac", "It runs OpenAirDisplay \(v == "older" ? "(older version)" : v); this Mac runs \(mine). Copy the same app to both Macs.")
         }
     }
     func notify(_ title: String, _ body: String = "") {
@@ -158,7 +158,9 @@ final class Ladder {
         }
     }
 
+    var lastBattery = false
     func autoTick() {
+        if onBattery != lastBattery { lastBattery = onBattery; if defaults.bool(forKey: "batteryCap") { reencode() } }
         for (id, e) in extras { if let L = extraLadders[id] { stepLadder(e, L) { idx, _ in L.idx = idx; L.lastChange = Date(); L.bad = 0; L.good = 0; e.setPreset(presets[idx]) } } }
         for (id, e) in extras { dlog("tx stat \(name(of: id)): \(e.linkType) \(e.preset.short) \(Int(e.fps)) fps drops=\(e.dropped) rtt=\(Int(e.rttMs))ms rx=\(Int(e.rxFps))") }
         if let p = session { dlog("tx stat primary \(p.receiverName): \(p.linkType) \(p.preset.short) \(Int(p.fps)) fps drops=\(p.dropped) rtt=\(Int(p.rttMs))ms rx=\(Int(p.rxFps))") }
@@ -469,7 +471,7 @@ final class Ladder {
         live.looksLike = s.pointW > 0 ? "\(s.pointW)×\(s.pointH)" + (s.pointW < s.backW ? " @2x" : "") : "—"
         live.encoder = s.encInfo
         live.quality = autoQ ? "Auto · \(presets[effIdx].short)" : presets[qualityMode].short
-        live.fps = s.fps; live.target = effFps(s.capW, s.capH, s.preset.fps, hevc: s.hevc); live.mbps = s.mbps; live.rtt = s.rttMs; live.rxFps = s.rxFps
+        live.fps = s.fps; live.target = effFps(s.capW, s.capH, s.preset.fps, hevc: s.hevc); live.mbps = s.mbps; live.rtt = s.rttMs; live.pipe = s.pipeMs; live.rxFps = s.rxFps
         live.gb = Double(s.bytes) / 1e9; live.dropped = s.dropped
         let secs = Int(Date().timeIntervalSince(s.startedAt))
         live.uptime = String(format: "%d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60)
@@ -488,7 +490,7 @@ final class Ladder {
         var size = 0; sysctlbyname("hw.model", nil, &size, nil, 0)
         var m = [CChar](repeating: 0, count: max(size, 1)); sysctlbyname("hw.model", &m, &size, nil, 0)
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-        var l = ["AirDisplay \(v)", "Mac: \(String(cString: m))", "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)",
+        var l = ["OpenAirDisplay \(v)", "Mac: \(String(cString: m))", "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)",
                  "Status: \(status)", "Quality: \(autoQ ? "Auto" : presets[qualityMode].name)", "Link mode: \(["Auto", "Wired only", "Wi-Fi only"][min(max(linkMode, 0), 2)])",
                  "Resolution mode: \(defaults.string(forKey: "resMode") ?? "match")", "Retina: \(defaults.string(forKey: "hidpi") ?? "auto")",
                  "FPS cap: \(defaults.integer(forKey: "fpsCap"))", "Color: \(defaults.string(forKey: "colorProfile") ?? "auto")", "Paired receivers: \(keys.peers.count)"]

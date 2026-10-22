@@ -3,7 +3,7 @@ import AVFoundation
 import VideoToolbox
 import Network
 
-let agentLabel = "com.sanan.airdisplay.receiver"
+let agentLabel = "com.sanan.openairdisplay.receiver"
 let agentPath = NSHomeDirectory() + "/Library/LaunchAgents/\(agentLabel).plist"
 
 final class KeyWindow: NSWindow {
@@ -24,7 +24,7 @@ final class RxConn {
 
 final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    let keys = Keys(appDir: "AirDisplayReceiver")
+    let keys = Keys(appDir: "OpenAirDisplayReceiver")
     let myName = Host.current().localizedName ?? "Mac"
     var listener: NWListener?
     var active: RxConn?
@@ -478,7 +478,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let spin = NSProgressIndicator(); spin.style = .spinning; spin.controlSize = .small; spin.startAnimation(nil)
         let l = label("Ready to pair · closes in 5:00", size: 12, color: .secondaryLabelColor); pairLabel = l
         setPanel([label("This Mac is ready", size: 18, weight: .bold),
-                  label("On your main Mac, open AirDisplay. It will ask “Pair with \(myName)?”. Click Pair there, then check the number here."),
+                  label("On your main Mac, open OpenAirDisplay. It will ask “Pair with \(myName)?”. Click Pair there, then check the number here."),
                   spin, l,
                   label("Both Macs need to be on the same network, or cabled together. If macOS asks about Local Network access, click Allow.", size: 11, color: .secondaryLabelColor)])
     }

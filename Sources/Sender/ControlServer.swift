@@ -133,7 +133,7 @@ func peerName(_ fd: Int32) -> String {
 
     func sessionDict(_ s: Session, id: String?) -> [String: Any] {
         ["receiver": s.receiverName, "id": id ?? "", "link": s.linkType, "interface": s.iface, "resolution": "\(s.capW)x\(s.capH)",
-         "fps": r1(s.fps), "mbps": r1(s.mbps), "latencyMs": r1(s.rttMs), "dropped": s.dropped, "codec": s.encInfo,
+         "fps": r1(s.fps), "mbps": r1(s.mbps), "latencyMs": r1(s.rttMs), "captureEncodeMs": r1(s.pipeMs), "dropped": s.dropped, "codec": s.encInfo,
          "uptimeSec": Int(Date().timeIntervalSince(s.startedAt)), "idle": s.fps < 3.5]
     }
 
@@ -184,7 +184,7 @@ func peerName(_ fd: Int32) -> String {
         case "use_receiver":
             let (id, err) = resolve(a["receiver"] as? String)
             guard let id = id else { return fail(err ?? "unknown receiver") }
-            guard keys.peer(id: id) != nil else { return fail("\(name(of: id)) is not paired yet. Pairing needs the person: choose it in the AirDisplay menu and confirm the 6-digit number on both Macs.") }
+            guard keys.peer(id: id) != nil else { return fail("\(name(of: id)) is not paired yet. Pairing needs the person: choose it in the OpenAirDisplay menu and confirm the 6-digit number on both Macs.") }
             let extra = (a["role"] as? String) == "extra"
             var note = ""
             if extra {
@@ -230,14 +230,14 @@ func peerName(_ fd: Int32) -> String {
         var findings: [[String: String]] = []
         func add(_ sev: String, _ issue: String, _ fix: String) { findings.append(["severity": sev, "issue": issue, "suggestedFix": fix]) }
 
-        if permissionProblem { add("error", "Screen Recording permission is missing, so nothing can be captured.", "System Settings › Privacy & Security › Screen Recording: turn AirDisplay on, then restart the app.") }
-        if copies > 1 { add("error", "\(copies) copies of AirDisplay are running. They fight over the same receiver (connect, kick off, repeat).", "Quit all copies, then open one.") }
+        if permissionProblem { add("error", "Screen Recording permission is missing, so nothing can be captured.", "System Settings › Privacy & Security › Screen Recording: turn OpenAirDisplay on, then restart the app.") }
+        if copies > 1 { add("error", "\(copies) copies of OpenAirDisplay are running. They fight over the same receiver (connect, kick off, repeat).", "Quit all copies, then open one.") }
         if !enabled { add("info", "Streaming is paused.", "resume_streaming") }
         if keys.peers.isEmpty { add("warn", "No receiver is paired.", "On the other Mac choose “Extra screen” and pair it from this Mac's menu (the person must confirm the 6-digit number).") }
         if enabled, let t = targetID, found[t] == nil, session?.stream == nil {
-            add("warn", "\(name(of: t)) is not visible on the network.", "Check that it is awake, its AirDisplay app is open in extra-screen role, and both Macs share the network or a cable. Wake-on-LAN is tried automatically for wired receivers.")
+            add("warn", "\(name(of: t)) is not visible on the network.", "Check that it is awake, its OpenAirDisplay app is open in extra-screen role, and both Macs share the network or a cable. Wake-on-LAN is tried automatically for wired receivers.")
         }
-        if enabled { for id in extraIDs where found[id] == nil && extras[id]?.stream == nil { add("warn", "\(name(of: id)) (extra screen) is not visible on the network.", "Check it is awake with its AirDisplay app in extra-screen role, and that the cable or Wi-Fi is connected.") } }
+        if enabled { for id in extraIDs where found[id] == nil && extras[id]?.stream == nil { add("warn", "\(name(of: id)) (extra screen) is not visible on the network.", "Check it is awake with its OpenAirDisplay app in extra-screen role, and that the cable or Wi-Fi is connected.") } }
         var sessions: [[String: Any]] = []
         if let s = session, s.stream != nil { sessions.append(sessionDict(s, id: targetID)) }
         for (id, e) in extras where e.stream != nil { sessions.append(sessionDict(e, id: id)) }
@@ -250,7 +250,7 @@ func peerName(_ fd: Int32) -> String {
             if !idle && fps > 0 && fps < 20 { add("warn", "\(n): only \(fps) fps while the screen is changing.", "Lower the quality or switch to a wired link.") }
         }
         if let up = upgradeAvailable { add("info", "A better link is available: \(up).", "restart_stream moves to it.") }
-        if defaults.object(forKey: "acceptInput") as? Bool ?? true, !Injector.trusted { add("info", "Accessibility permission is off, so keyboard and mouse from the extra screen cannot be used.", "System Settings › Privacy & Security › Accessibility: turn AirDisplay on.") }
+        if defaults.object(forKey: "acceptInput") as? Bool ?? true, !Injector.trusted { add("info", "Accessibility permission is off, so keyboard and mouse from the extra screen cannot be used.", "System Settings › Privacy & Security › Accessibility: turn OpenAirDisplay on.") }
         if net["internetReachable"] as? Bool == false { add("warn", "This Mac cannot reach the internet. If it is also an Ethernet-linked pair, a link-only adapter may have become the default route.", "Check the Mac's network service order and that the direct cable network has no router set.") }
         let log = recentLog(80)
         let failures = log.filter { $0.contains("failed") || $0.contains("closed the connection") }.count
