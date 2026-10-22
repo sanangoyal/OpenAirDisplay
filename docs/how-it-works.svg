@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="t d">
+  <title id="t">How OpenAirDisplay works</title>
+  <desc id="d">The main Mac creates a virtual display, captures it, encodes it with hardware H.264 or HEVC and sends it over an encrypted link to the extra-screen Mac, which decodes and shows it full screen. Keyboard and mouse can travel back. An AI agent can control the main Mac app through MCP.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8fa2ff"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f5b84b"/></marker>
+  </defs>
+  <style>
+    .t{font-family:-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif}
+    .h{font-size:15px;font-weight:700;fill:#8fa2ff;letter-spacing:.8px}
+    .n{font-size:17px;font-weight:700;fill:#f1f5ff}
+    .s{font-size:13px;fill:#9aa6d6}
+    .box{fill:#161d3a;stroke:#34417f;stroke-width:1.5}
+    .grp{fill:#0d1330;stroke:#2b3770;stroke-width:1.5;stroke-dasharray:6 6}
+  </style>
+  <rect width="1200" height="560" rx="18" fill="#0a0f1f"/>
+
+  <rect class="grp" x="24" y="96" width="610" height="276" rx="16"/>
+  <text class="t h" x="48" y="128">MAIN MAC · sender (macOS 13+)</text>
+  <rect class="grp" x="846" y="96" width="330" height="276" rx="16"/>
+  <text class="t h" x="870" y="128">EXTRA SCREEN · receiver (macOS 12+)</text>
+
+  <rect class="box" x="48" y="158" width="170" height="92" rx="12"/>
+  <text class="t n" x="133" y="196" text-anchor="middle">Virtual display</text>
+  <text class="t s" x="133" y="220" text-anchor="middle">matches the other</text>
+  <text class="t s" x="133" y="238" text-anchor="middle">Mac's panel</text>
+  <rect class="box" x="246" y="158" width="170" height="92" rx="12"/>
+  <text class="t n" x="331" y="196" text-anchor="middle">Capture</text>
+  <text class="t s" x="331" y="220" text-anchor="middle">ScreenCaptureKit</text>
+  <text class="t s" x="331" y="238" text-anchor="middle">only that display</text>
+  <rect class="box" x="444" y="158" width="170" height="92" rx="12"/>
+  <text class="t n" x="529" y="196" text-anchor="middle">Encode</text>
+  <text class="t s" x="529" y="220" text-anchor="middle">hardware H.264</text>
+  <text class="t s" x="529" y="238" text-anchor="middle">or HEVC</text>
+  <path d="M218 204h26" stroke="#8fa2ff" stroke-width="2.5" marker-end="url(#a)"/>
+  <path d="M416 204h26" stroke="#8fa2ff" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <rect class="box" x="870" y="158" width="130" height="92" rx="12"/>
+  <text class="t n" x="935" y="196" text-anchor="middle">Decode</text>
+  <text class="t s" x="935" y="220" text-anchor="middle">hardware</text>
+  <rect class="box" x="1020" y="158" width="132" height="92" rx="12"/>
+  <text class="t n" x="1086" y="196" text-anchor="middle">Show</text>
+  <text class="t s" x="1086" y="220" text-anchor="middle">full screen,</text>
+  <text class="t s" x="1086" y="238" text-anchor="middle">native pixels</text>
+  <path d="M1000 204h18" stroke="#8fa2ff" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <path d="M614 204 C 700 204, 760 204, 868 204" stroke="#8fa2ff" stroke-width="2.5" fill="none" marker-end="url(#a)"/>
+  <rect x="650" y="176" width="190" height="56" rx="12" fill="#0a0f1f" stroke="#2dd4a0" stroke-width="1.5"/>
+  <text class="t n" x="745" y="199" text-anchor="middle" style="fill:#2dd4a0;font-size:15px">Encrypted link</text>
+  <text class="t s" x="745" y="219" text-anchor="middle">Thunderbolt · Ethernet · Wi-Fi</text>
+
+  <path d="M1086 262 V320 H133 V262" stroke="#f5b84b" stroke-width="2" fill="none" stroke-dasharray="7 6" marker-end="url(#b)"/>
+  <rect x="470" y="302" width="330" height="36" rx="18" fill="#0a0f1f" stroke="#f5b84b" stroke-width="1.5"/>
+  <text class="t s" x="635" y="325" text-anchor="middle" style="fill:#f5b84b">Optional: keyboard &amp; mouse travel back</text>
+
+  <rect class="box" x="24" y="404" width="610" height="124" rx="16" style="stroke:#7c5cff"/>
+  <text class="t h" x="48" y="436" style="fill:#b49cff">AI &amp; SCRIPTS · off by default</text>
+  <text class="t n" x="48" y="468">MCP server: <tspan style="font-weight:500;fill:#cfd6ff">status · diagnose · use receiver · quality · link</tspan></text>
+  <text class="t s" x="48" y="494">Local socket only (0600, same user). Pairing, input forwarding and role stay manual.</text>
+  <path d="M329 404 V380" stroke="#b49cff" stroke-width="2.5" marker-end="url(#a)" style="stroke-dasharray:6 5"/>
+
+  <rect class="box" x="846" y="404" width="330" height="124" rx="16" style="stroke:#2dd4a0"/>
+  <text class="t h" x="870" y="436" style="fill:#2dd4a0">ONE-TIME PAIRING</text>
+  <text class="t n" x="870" y="468">Same 6-digit number on both Macs</text>
+  <text class="t s" x="870" y="494">Keys pinned after that · AES-GCM · no servers</text>
+</svg>

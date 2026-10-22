@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="t d">
+  <title id="t">OpenAirDisplay: use an old Mac as a 4K external display</title>
+  <desc id="d">A MacBook sends its desktop to an older iMac, which becomes a second 4K screen.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0f1f"/><stop offset="1" stop-color="#1c1346"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#6d7cff" stop-opacity="0.45"/><stop offset="1" stop-color="#6d7cff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="scr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e2a5a"/><stop offset="1" stop-color="#3b2b78"/></linearGradient>
+    <linearGradient id="alu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8dce6"/><stop offset="1" stop-color="#aeb4c4"/></linearGradient>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8fa2ff"/></marker>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <circle cx="1010" cy="300" r="330" fill="url(#glow)"/>
+
+  <g font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" fill="#fff">
+    <text x="70" y="214" font-size="74" font-weight="800" letter-spacing="-2">OpenAirDisplay</text>
+    <text x="72" y="276" font-size="32" font-weight="600" fill="#dfe5ff">Use any old Mac as a 4K</text>
+    <text x="72" y="318" font-size="32" font-weight="600" fill="#dfe5ff">external display.</text>
+    <text x="72" y="372" font-size="21" fill="#9aa6d6">iMac 2015+ · wired or wireless · native resolution</text>
+    <text x="72" y="402" font-size="21" fill="#9aa6d6">Free, open source, no account, no dongle. MCP ready.</text>
+    <g font-size="17" font-weight="600">
+      <rect x="72" y="446" width="104" height="38" rx="19" fill="#2dd4a0"/><text x="124" y="471" text-anchor="middle" fill="#04241b">macOS</text>
+      <rect x="188" y="446" width="406" height="38" rx="19" fill="none" stroke="#5a67a8" stroke-width="1.5"/>
+      <text x="391" y="471" text-anchor="middle" fill="#b9c3f5">iPhone · iPad · Android · TV · Windows: soon</text>
+    </g>
+  </g>
+
+  <g>
+    <rect x="636" y="318" width="214" height="136" rx="9" fill="#cfd4e0"/>
+    <rect x="642" y="324" width="202" height="124" rx="5" fill="url(#scr)"/>
+    <rect x="654" y="338" width="86" height="52" rx="4" fill="#7c9cff" opacity="0.9"/>
+    <rect x="750" y="338" width="82" height="24" rx="4" fill="#ffffff" opacity="0.25"/>
+    <rect x="750" y="370" width="82" height="20" rx="4" fill="#ffffff" opacity="0.15"/>
+    <rect x="654" y="400" width="178" height="8" rx="4" fill="#ffffff" opacity="0.18"/>
+    <path d="M616 454h254l-14 14h-226z" fill="url(#alu)"/>
+    <rect x="715" y="454" width="56" height="5" rx="2.5" fill="#8d93a4"/>
+  </g>
+
+  <path d="M858 372 C 900 372, 905 330, 948 330" fill="none" stroke="#8fa2ff" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round" marker-end="url(#ah)"/>
+  <text x="900" y="404" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#9aa6d6">encrypted</text>
+
+  <g>
+    <rect x="950" y="150" width="290" height="214" rx="14" fill="#e3e6ee"/>
+    <rect x="958" y="158" width="274" height="168" rx="6" fill="url(#scr)"/>
+    <rect x="970" y="172" width="120" height="80" rx="5" fill="#7c9cff" opacity="0.9"/>
+    <rect x="1100" y="172" width="120" height="36" rx="5" fill="#ffffff" opacity="0.28"/>
+    <rect x="1100" y="216" width="120" height="36" rx="5" fill="#ffffff" opacity="0.16"/>
+    <rect x="970" y="262" width="250" height="12" rx="6" fill="#ffffff" opacity="0.18"/>
+    <text x="1095" y="306" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="700" fill="#e8ecff">4096 × 2304</text>
+    <path d="M950 326h290v24a14 14 0 0 1-14 14h-262a14 14 0 0 1-14-14z" fill="#f2f3f7"/>
+    <path d="M1070 364h50l10 78h-70z" fill="url(#alu)"/>
+    <rect x="1030" y="440" width="130" height="10" rx="5" fill="#b4bac9"/>
+  </g>
+</svg>
