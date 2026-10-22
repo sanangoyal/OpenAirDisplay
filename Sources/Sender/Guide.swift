@@ -202,9 +202,11 @@ import Cocoa
         if let f = app.found.values.first(where: { app.keys.peer(id: $0.id) == nil }) { app.offerPair(f, userAsked: true) }
     }
     @objc func connectNow() { app.enabled = true; app.tick() }
-    @objc func finish() { win?.close() }
+    @objc func finish() { defaults.set(true, forKey: "onboarded"); win?.close() }
+    /// Only a deliberate close (red button, Close, Done) counts as "I've seen the guide". When macOS restarts the app after
+    /// Screen Recording is granted it closes the windows itself, which must not mark setup as finished.
+    func windowShouldClose(_ sender: NSWindow) -> Bool { defaults.set(true, forKey: "onboarded"); return true }
     func windowWillClose(_ n: Notification) {
         timer?.invalidate(); timer = nil; win = nil; cards = []
-        defaults.set(true, forKey: "onboarded")
     }
 }
