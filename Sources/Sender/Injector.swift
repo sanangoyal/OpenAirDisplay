@@ -18,8 +18,16 @@ final class Injector {
             if !asked { asked = true; _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary) }
             return
         }
+        // Pointer moves are relative (fractions of the extra screen's picture), so the cursor can flow between
+        // the extra screen and this Mac's own screens like one continuous desktop.
         let b = CGDisplayBounds(display)
-        let pos = CGPoint(x: b.minX + CGFloat(min(max(e.x, 0), 1)) * b.width, y: b.minY + CGFloat(min(max(e.y, 0), 1)) * b.height)
+        let cur = CGEvent(source: nil)?.location ?? CGPoint(x: b.midX, y: b.midY)
+        var pos = cur
+        if e.kind == .move || e.kind == .drag {
+            pos = CGPoint(x: cur.x + CGFloat(e.x) * b.width, y: cur.y + CGFloat(e.y) * b.height)
+            let u = Injector.desktop()
+            pos.x = min(max(pos.x, u.minX), u.maxX - 1); pos.y = min(max(pos.y, u.minY), u.maxY - 1)
+        }
         let fl = CGEventFlags(rawValue: e.flags)
         switch e.kind {
         case .move:
@@ -54,6 +62,12 @@ final class Injector {
             ev?.type = .flagsChanged
             post(ev, fl)
         }
+    }
+
+    static func desktop() -> CGRect {
+        var n: UInt32 = 0; var ids = [CGDirectDisplayID](repeating: 0, count: 16)
+        CGGetActiveDisplayList(16, &ids, &n)
+        return ids.prefix(Int(n)).reduce(CGRect.null) { $0.union(CGDisplayBounds($1)) }
     }
 
     private func post(_ ev: CGEvent?, _ flags: CGEventFlags) {

@@ -73,7 +73,7 @@ import SwiftUI
                 if case let .bonjour(txt) = r.metadata, let v = txt.dictionary["id"] { id = v }
                 f[id] = Found(id: id, name: name, endpoint: r.endpoint, ifaces: Array(r.interfaces))
             }
-            DispatchQueue.main.async { self?.found = f; self?.tick() }
+            DispatchQueue.main.async { if let s = self, Set(f.keys) != Set(s.found.keys) { s.badIface.removeAll() }; self?.found = f; self?.tick() }
         }
         b.stateUpdateHandler = { st in if case .failed = st { DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.startBrowser() } } }
         b.start(queue: .main)

@@ -51,6 +51,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
     var chan: Channel?
     var deframer = Deframer()
     var receiverName = "iMac"
+    var lastPongAt = Date()
     var onVersion: ((String) -> Void)?
     var capW = 0, capH = 0, backW = 0, backH = 0
 
@@ -127,7 +128,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] d, _, done, err in
             guard let self = self, !self.ended else { return }
             if let d = d { self.onData(d) }
-            if done || err != nil { self.fail(self.live ? "iMac closed connection" : nil) } else { self.recvLoop() }
+            if done || err != nil { self.fail(self.live ? "Receiver closed connection" : nil) } else { self.recvLoop() }
         }
     }
 
@@ -167,7 +168,9 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
             }
         case MT.input:
             if let ev = InputEvent(p) { DispatchQueue.main.async { if !self.ended { Injector.shared.handle(ev, display: self.vd?.displayID ?? CGMainDisplayID()) } } }
+        case MT.bye: fail("Receiver paused")
         case MT.pong:
+            lastPongAt = Date()
             guard p.count >= 12 else { return }
             let ts = p.withUnsafeBytes { UInt64(bigEndian: $0.loadUnaligned(fromByteOffset: 0, as: UInt64.self)) }
             let cnt = p.withUnsafeBytes { UInt32(bigEndian: $0.loadUnaligned(fromByteOffset: 8, as: UInt32.self)) }
@@ -301,10 +304,11 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
             self.lock.lock(); let pb = self.lastPB; self.lock.unlock()
             if let pb = pb { self.handle(pb, CMClockGetTime(CMClockGetHostTimeClock())) }
         }
-        var lt = Date()
+        var lt = Date(); lastPongAt = Date()
         statTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             let now = Date(); let dt = max(0.05, now.timeIntervalSince(lt)); lt = now
+            if now.timeIntervalSince(self.lastPongAt) > 5 { self.end("Receiver not responding"); return }   // dead link: drop and reconnect
             let f = Double(self.frames - lf) / dt, m = Double(self.bytes - lb) * 8 / 1e6 / dt
             let r = Double(self.rxFrames - self.lastRx) / dt
             self.fps = self.fps * 0.4 + f * 0.6; self.mbps = self.mbps * 0.4 + m * 0.6; self.rxFps = self.rxFps * 0.4 + r * 0.6

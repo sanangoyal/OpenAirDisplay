@@ -53,6 +53,8 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     var pairCode: String?, pairExpires = Date.distantPast, attempts = 0
     var pairPanel: NSPanel?, pairLabel: NSTextField?, pairTimer: Timer?
 
+    func applicationWillTerminate(_ n: Notification) { CGAssociateMouseAndMouseCursorPosition(1) }
+
     func applicationDidFinishLaunching(_ n: Notification) {
         NotificationCenter.default.addObserver(self, selector: #selector(screenChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         item.button?.image = menuGlyph(filled: false, back: true)
@@ -306,7 +308,8 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         streaming = false
         teardownInput(); watchdog?.invalidate(); watchdog = nil
         item.button?.image = menuGlyph(filled: false, slashed: paused, back: true)
-        active?.c.cancel(); active = nil
+        if let rc = active { sendSecure(rc, MT.bye, Data()); q.asyncAfter(deadline: .now() + 0.25) { rc.c.cancel() } }   // tell the sender, then close
+        active = nil
         win?.orderOut(nil); win = nil
         stopAudio()
         if cursorHidden { NSCursor.unhide(); cursorHidden = false }
@@ -338,6 +341,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func setupInput() {
         teardownInput()
         win?.acceptsMouseMovedEvents = true
+        CGAssociateMouseAndMouseCursorPosition(0)   // freeze the local pointer so movement is unlimited at the edges
         let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp, .flagsChanged, .mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
                                            .otherMouseDown, .otherMouseUp, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel]
         inputMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] e in
@@ -350,11 +354,18 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if let m = inputMonitor { NSEvent.removeMonitor(m); inputMonitor = nil }
         escTimer?.invalidate(); escTimer = nil; escFired = false
         win?.acceptsMouseMovedEvents = false
+        CGAssociateMouseAndMouseCursorPosition(1)
     }
 
     func forward(_ e: NSEvent) {
         let fl = UInt64(e.modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue)
-        let (x, y) = e.type == .keyDown || e.type == .keyUp || e.type == .flagsChanged ? (0, 0) : norm(e)
+        let vr = videoRect()
+        var x: Float = 0, y: Float = 0   // pointer moves: movement as a fraction of the picture size
+        switch e.type {
+        case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
+            if vr.width > 1 && vr.height > 1 { x = Float(e.deltaX / vr.width); y = Float(e.deltaY / vr.height) }
+        default: break
+        }
         func btn(_ k: InputEvent.Kind) { sendInput(InputEvent(kind: k, code: UInt16(min(e.buttonNumber, 2)) | UInt16(max(e.clickCount, 1)) << 8, flags: fl, x: x, y: y)) }
         switch e.type {
         case .mouseMoved: sendInput(InputEvent(kind: .move, flags: fl, x: x, y: y))
