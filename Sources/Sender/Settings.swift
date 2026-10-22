@@ -195,6 +195,7 @@ import UserNotifications
     @AppStorage("acceptInput") var acceptInput = true
     @AppStorage("agentControl") var agentControl = false
     @StateObject var login = Flag(SMAppService.mainApp.status == .enabled)
+    @StateObject var ax = Flag(Injector.trusted)
     var body: some View {
         Form {
             Section("Streaming") {
@@ -205,8 +206,9 @@ import UserNotifications
             Section("Extra screen input") {
                 Row(title: "Accept keyboard & mouse", info: "Lets the extra screen's keyboard and mouse control this Mac. The receiver must also turn it on (Settings › Display). Needs Accessibility permission. Pause anytime with ⌃⌥⌘D.") { Toggle("", isOn: $acceptInput).labelsHidden() }
                 Row(title: "Accessibility", info: "macOS requires this permission before an app can send keyboard and mouse events.") {
-                    HStack { Text(Injector.trusted ? "Allowed" : "Not allowed").foregroundStyle(.secondary)
-                        Button("Open…") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!) } }
+                    HStack { Text(ax.on ? "Allowed" : "Not allowed").foregroundStyle(ax.on ? Color.green : Color.orange)
+                        if !ax.on { Button("Allow…") { _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary)
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!) } } }
                 }
             }
             Section("AI agents & scripts") {
@@ -237,6 +239,7 @@ import UserNotifications
             }
         }
         .formStyle(.grouped)
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in let t = Injector.trusted; if t != ax.on { ax.on = t } }   // updates by itself after you allow it in System Settings
         .onChange(of: enabled) { app.setEnabled($0) }
         .onChange(of: audio) { app.audioOn = $0; app.session?.audioOn = $0 }
         .onChange(of: notif) { if $0 { UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { _, _ in } } }
