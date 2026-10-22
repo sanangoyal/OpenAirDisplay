@@ -2,6 +2,16 @@ import Cocoa
 
 setvbuf(stdout, nil, _IOLBF, 0)
 
+// One copy only: two copies would both grab the same receiver and keep kicking each other off (the lower PID wins; a
+// relaunch after a role switch waits a moment for the old copy to quit).
+if let bid = Bundle.main.bundleIdentifier {
+    let me = ProcessInfo.processInfo.processIdentifier
+    func others() -> [NSRunningApplication] { NSRunningApplication.runningApplications(withBundleIdentifier: bid).filter { $0.processIdentifier != me && !$0.isTerminated } }
+    var tries = 0
+    while !others().isEmpty && tries < 15 { if others().allSatisfy({ $0.processIdentifier > me }) { break }; usleep(200_000); tries += 1 }
+    if others().contains(where: { $0.processIdentifier < me }) { exit(0) }
+}
+
 let nsApplication = NSApplication.shared
 var rootDelegate: NSApplicationDelegate
 

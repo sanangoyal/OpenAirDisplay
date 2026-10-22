@@ -5,6 +5,12 @@ import ServiceManagement
 import UserNotifications
 import SwiftUI
 
+final class Ladder {
+    var idx = 1, bad = 0, good = 0, lastDropped = 0
+    var lastChange = Date.distantPast
+    var blocked = [Date](repeating: .distantPast, count: presets.count)
+}
+
 @available(macOS 13.0, *) struct Found { let id: String; let name: String; let endpoint: NWEndpoint; let ifaces: [NWInterface]; var pairing = false }
 
 @available(macOS 13.0, *) final class SenderApp: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
@@ -19,8 +25,15 @@ import SwiftUI
     var permissionProblem = false
     var timer: Timer?, autoTimer: Timer?, liveTimer: Timer?
     var statItems: [NSMenuItem] = []
-    var effIdx = 1, badSecs = 0, goodSecs = 0, lastDropped = 0, lastChange = Date.distantPast
-    var blockedUntil = [Date](repeating: .distantPast, count: presets.count)
+    // Auto-quality state lives in a Ladder: one for the primary receiver, one per extra receiver, so a slow Wi-Fi Mac never drags down a wired one.
+    let L0 = Ladder()
+    var extraLadders: [String: Ladder] = [:]
+    var effIdx: Int { get { L0.idx } set { L0.idx = newValue } }
+    var badSecs: Int { get { L0.bad } set { L0.bad = newValue } }
+    var goodSecs: Int { get { L0.good } set { L0.good = newValue } }
+    var lastDropped: Int { get { L0.lastDropped } set { L0.lastDropped = newValue } }
+    var lastChange: Date { get { L0.lastChange } set { L0.lastChange = newValue } }
+    var blockedUntil: [Date] { get { L0.blocked } set { L0.blocked = newValue } }
     var guide: Guide?
     let live = Live()
     var settings: SettingsWindow?
@@ -110,13 +123,43 @@ import SwiftUI
     }
 
     // MARK: quality
-    func applyQuality(_ idx: Int, why: String?) {
+    /// `all`: a manual level chosen by the user applies to every receiver; auto steps only the receiver that struggled.
+    func applyQuality(_ idx: Int, why: String?, all: Bool = false) {
         effIdx = idx; lastChange = Date(); badSecs = 0; goodSecs = 0
-        session?.setPreset(presets[idx]); for e in extras.values { e.setPreset(presets[idx]) }
+        session?.setPreset(presets[idx])
+        if all { for (id, e) in extras { if let L = extraLadders[id] { L.idx = idx; L.lastChange = Date(); L.bad = 0; L.good = 0 }; e.setPreset(presets[idx]) } }
         if let w = why { notify("Display quality: \(presets[idx].short)", w) }
     }
 
+    /// One second of the auto-quality loop for one receiver. `apply` changes its level.
+    func stepLadder(_ s: Session, _ L: Ladder, apply: (Int, String) -> Void) {
+        guard s.stream != nil else { L.bad = 0; L.good = 0; L.lastDropped = 0; return }
+        guard autoQ else { return }
+        let newDrops = s.dropped - L.lastDropped; L.lastDropped = s.dropped
+        let slowDecode = s.fps > 20 && s.rxFps > 0 && s.rxFps < s.fps * 0.75
+        let bad = newDrops >= 3 || s.rttMs > 30 || slowDecode
+        let since = Date().timeIntervalSince(L.lastChange)
+        let wired = s.linkType == "Ethernet" || s.linkType == "Thunderbolt"
+        let minIdx = wired ? 0 : 1     // Ultra only on a wired link
+        if L.idx < minIdx { apply(minIdx, "Left the wired link, lowered automatically."); return }
+        if bad {
+            L.bad += 1; L.good = 0
+            if L.bad >= 3, L.idx < autoLadder - 1, since > 8 {
+                L.blocked[L.idx] = Date().addingTimeInterval(300)
+                apply(L.idx + 1, "Link or receiver struggling, lowered automatically.")
+            }
+        } else {
+            L.good += 1; L.bad = 0
+            if L.good >= 40, L.idx > minIdx, L.blocked[L.idx - 1] < Date(), since > 40 {
+                apply(L.idx - 1, "Link stable, raised automatically.")
+            }
+        }
+    }
+
     func autoTick() {
+        for (id, e) in extras { if let L = extraLadders[id] { stepLadder(e, L) { idx, _ in L.idx = idx; L.lastChange = Date(); L.bad = 0; L.good = 0; e.setPreset(presets[idx]) } } }
+        for (id, e) in extras { dlog("tx stat \(name(of: id)): \(e.linkType) \(e.preset.short) \(Int(e.fps)) fps drops=\(e.dropped) rtt=\(Int(e.rttMs))ms rx=\(Int(e.rxFps))") }
+        if let p = session { dlog("tx stat primary \(p.receiverName): \(p.linkType) \(p.preset.short) \(Int(p.fps)) fps drops=\(p.dropped) rtt=\(Int(p.rttMs))ms rx=\(Int(p.rxFps))") }
         guard let s = session, s.stream != nil else { badSecs = 0; goodSecs = 0; lastDropped = 0; return }
         if lastLink == "Ethernet" && s.linkType == "Wi-Fi" { notify("Display fell back to Wi-Fi", "Expect more lag. Check the cable.") }
         if s.linkType != "…" && !s.linkType.isEmpty { lastLink = s.linkType }
@@ -124,26 +167,7 @@ import SwiftUI
             if Date().timeIntervalSince(s.startedAt) < 20 { switchNow(); return }   // just connected, nothing to disrupt
             if !offeredSwitch { offeredSwitch = true; notifySwitch(w) }
         }
-        guard autoQ else { return }
-        let newDrops = s.dropped - lastDropped; lastDropped = s.dropped
-        let slowDecode = s.fps > 20 && s.rxFps > 0 && s.rxFps < s.fps * 0.75
-        let bad = newDrops >= 3 || s.rttMs > 30 || slowDecode
-        let since = Date().timeIntervalSince(lastChange)
-        let wired = s.linkType == "Ethernet" || s.linkType == "Thunderbolt"
-        let minIdx = wired ? 0 : 1     // Ultra only on a wired link
-        if effIdx < minIdx { applyQuality(minIdx, why: "Left the wired link, lowered automatically."); return }
-        if bad {
-            badSecs += 1; goodSecs = 0
-            if badSecs >= 3, effIdx < autoLadder - 1, since > 8 {
-                blockedUntil[effIdx] = Date().addingTimeInterval(300)
-                applyQuality(effIdx + 1, why: "Link or receiver struggling, lowered automatically.")
-            }
-        } else {
-            goodSecs += 1; badSecs = 0
-            if goodSecs >= 40, effIdx > minIdx, blockedUntil[effIdx - 1] < Date(), since > 40 {
-                applyQuality(effIdx - 1, why: "Link stable, raised automatically.")
-            }
-        }
+        stepLadder(s, L0) { idx, why in applyQuality(idx, why: why) }
     }
 
     // MARK: link selection
@@ -212,7 +236,10 @@ import SwiftUI
 
     func startExtra(_ id: String, _ f: Found, iface: NWInterface?) {
         dlog("tx startExtra \(f.name) iface=\(iface?.name ?? "-")")
-        let s = Session(endpoint: f.endpoint, keys: keys, name: myName, code: nil, preset: presets[autoQ ? effIdx : qualityMode], mirror: mirrorOn)
+        let L = Ladder(); L.lastChange = Date()
+        L.idx = (iface.map { rank($0) } ?? 2) <= 1 ? 0 : 2      // best level this receiver's own link allows
+        extraLadders[id] = L
+        let s = Session(endpoint: f.endpoint, keys: keys, name: myName, code: nil, preset: presets[autoQ ? L.idx : qualityMode], mirror: mirrorOn)
         s.onVersion = { [weak self] v in self?.checkVersion(v) }
         s.audioOn = false; s.forceIface = iface          // sound goes to the primary receiver only
         s.onLive = { [weak self, weak s] in
@@ -491,7 +518,8 @@ import SwiftUI
     @objc func pickQuality(_ s: NSMenuItem) { setQuality(s.tag) }
     func setQuality(_ v: Int) {
         qualityMode = v
-        if v >= 0 { applyQuality(v, why: nil) } else { applyQuality(effIdx, why: nil) }
+        if v >= 0 { applyQuality(v, why: nil, all: true) }
+        else { applyQuality(effIdx, why: nil); for (id, e) in extras { e.setPreset(presets[extraLadders[id]?.idx ?? 1]) } }
     }
     @objc func pickDisplay(_ s: NSMenuItem) {
         let m = s.tag == 1

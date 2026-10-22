@@ -144,7 +144,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] d, _, done, err in
             guard let self = self, !self.ended else { return }
             if let d = d { self.onData(d) }
-            if done || err != nil { self.fail(self.live ? "Receiver closed connection" : nil) } else { self.recvLoop() }
+            if done || err != nil { self.fail(self.live ? "iMac closed connection" : nil) } else { self.recvLoop() }
         }
     }
 
