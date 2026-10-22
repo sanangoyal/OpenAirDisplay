@@ -133,7 +133,7 @@ func peerName(_ fd: Int32) -> String {
 
     func sessionDict(_ s: Session, id: String?) -> [String: Any] {
         ["receiver": s.receiverName, "id": id ?? "", "link": s.linkType, "interface": s.iface, "resolution": "\(s.capW)x\(s.capH)",
-         "fps": r1(s.fps), "mbps": r1(s.mbps), "latencyMs": r1(s.rttMs), "captureEncodeMs": r1(s.pipeMs), "dropped": s.dropped, "codec": s.encInfo,
+         "fps": r1(s.fps), "mbps": r1(s.mbps), "latencyMs": r1(s.rttMs), "captureEncodeMs": r1(s.pipeMs), "captureWaitMs": r1(s.ageMs), "encodeMs": r1(s.encMs), "dropped": s.dropped, "codec": s.encInfo,
          "uptimeSec": Int(Date().timeIntervalSince(s.startedAt)), "idle": s.fps < 3.5]
     }
 

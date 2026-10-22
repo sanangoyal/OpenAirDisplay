@@ -21,6 +21,7 @@ import UserNotifications
     @Published var mbps = 0.0
     @Published var rtt = 0.0
     @Published var pipe = 0.0
+    @Published var pipeSub = ""
     @Published var rxFps = 0.0
     @Published var gb = 0.0
     @Published var dropped = 0

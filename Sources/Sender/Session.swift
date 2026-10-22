@@ -83,7 +83,9 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
     var onLive: (() -> Void)?
     var onPaired: ((Peer) -> Void)?
     var fps = 0.0, mbps = 0.0
-    var pipeMs = 0.0   // capture delivery + encode time, smoothed (what this Mac adds before the network)
+    var encMs = 0.0, ageMs = 0.0
+    var pipeMs: Double { encMs + ageMs }
+
     var dropped = 0, startedAt = Date(), linkType = "…", iface = "", rttMs = 0.0
     var rxFrames = 0, lastRx = 0, rxFps = 0.0
     var statTimer: Timer?, idleTimer: Timer?
@@ -405,8 +407,9 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
         VTCompressionSessionEncodeFrame(e, imageBuffer: pb, presentationTimeStamp: pts, duration: .invalid,
             frameProperties: props, infoFlagsOut: nil) { [weak self] status, _, sb in
             guard let self = self, status == noErr, let sb = sb else { return }
-            let ms = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1e6 + (age.isFinite ? min(max(age, 0), 100) : 0)
-            self.pipeMs = self.pipeMs * 0.9 + ms * 0.1
+            let enc = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1e6
+            self.encMs = self.encMs * 0.9 + enc * 0.1
+            self.ageMs = self.ageMs * 0.9 + (age.isFinite ? min(max(age, 0), 100) : 0) * 0.1
             var key = true
             if let a = CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: false) as? [[CFString: Any]],
                let f = a.first, (f[kCMSampleAttachmentKey_NotSync] as? Bool) == true { key = false }

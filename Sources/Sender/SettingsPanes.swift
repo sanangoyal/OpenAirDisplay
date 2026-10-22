@@ -237,7 +237,7 @@ import UserNotifications
                     Tile(title: "Frame rate", value: live.connected ? "\(Int(live.fps.rounded())) fps" : "—", sub: live.connected ? "target \(live.target) · receiver \(Int(live.rxFps.rounded()))" : "")
                     Tile(title: "Bitrate", value: live.connected ? String(format: "%.1f Mbps", live.mbps) : "—", sub: live.connected ? String(format: "%.2f GB sent", live.gb) : "")
                     Tile(title: "Latency", value: live.connected ? String(format: "%.1f ms", live.rtt) : "—", sub: live.connected ? "round trip" : "")
-                    Tile(title: "Capture + encode", value: live.connected ? String(format: "%.1f ms", live.pipe) : "—", sub: live.connected ? String(format: "≈ %.0f ms to the other Mac's screen", live.pipe + live.rtt / 2) : "")
+                    Tile(title: "Capture + encode", value: live.connected ? String(format: "%.1f ms", live.pipe) : "—", sub: live.connected ? live.pipeSub : "")
                     Tile(title: "Dropped frames", value: live.connected ? "\(live.dropped)" : "—", sub: "this session")
                     Tile(title: "Link", value: live.connected ? live.link : "—", sub: live.iface)
                     Tile(title: "Session", value: live.connected ? live.uptime : "—", sub: live.connected ? live.receiver : "")

@@ -265,7 +265,12 @@ final class Ladder {
     }
 
     // MARK: sessions
-    func tick() { tickPrimary(); tickExtras(); considerPairing() }
+    func tick() {
+        // Without Screen Recording permission every connection attempt fails and flickers the receiver: wait until it is granted.
+        if permissionProblem && CGPreflightScreenCaptureAccess() { permissionProblem = false }
+        if permissionProblem && enabled { status = "Needs Screen Recording permission"; refreshIcon(); considerPairing(); return }
+        tickPrimary(); tickExtras(); considerPairing()
+    }
 
     func tickPrimary() {
         guard enabled, session == nil else { return }
@@ -471,7 +476,7 @@ final class Ladder {
         live.looksLike = s.pointW > 0 ? "\(s.pointW)×\(s.pointH)" + (s.pointW < s.backW ? " @2x" : "") : "—"
         live.encoder = s.encInfo
         live.quality = autoQ ? "Auto · \(presets[effIdx].short)" : presets[qualityMode].short
-        live.fps = s.fps; live.target = effFps(s.capW, s.capH, s.preset.fps, hevc: s.hevc); live.mbps = s.mbps; live.rtt = s.rttMs; live.pipe = s.pipeMs; live.rxFps = s.rxFps
+        live.fps = s.fps; live.target = effFps(s.capW, s.capH, s.preset.fps, hevc: s.hevc); live.mbps = s.mbps; live.rtt = s.rttMs; live.pipe = s.pipeMs; live.pipeSub = String(format: "capture %.0f · encode %.0f · ≈ %.0f ms to the screen", s.ageMs, s.encMs, s.pipeMs + s.rttMs / 2); live.rxFps = s.rxFps
         live.gb = Double(s.bytes) / 1e9; live.dropped = s.dropped
         let secs = Int(Date().timeIntervalSince(s.startedAt))
         live.uptime = String(format: "%d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60)
