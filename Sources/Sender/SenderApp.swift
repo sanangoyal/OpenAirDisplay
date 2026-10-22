@@ -5,7 +5,7 @@ import ServiceManagement
 import UserNotifications
 import SwiftUI
 
-@available(macOS 13.0, *) struct Found { let id: String; let name: String; let endpoint: NWEndpoint; let ifaces: [NWInterface] }
+@available(macOS 13.0, *) struct Found { let id: String; let name: String; let endpoint: NWEndpoint; let ifaces: [NWInterface]; var pairing = false }
 
 @available(macOS 13.0, *) final class SenderApp: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -71,8 +71,9 @@ import SwiftUI
             for r in results {
                 guard case let .service(name, _, _, _) = r.endpoint else { continue }
                 var id = name
-                if case let .bonjour(txt) = r.metadata, let v = txt.dictionary["id"] { id = v }
-                f[id] = Found(id: id, name: name, endpoint: r.endpoint, ifaces: Array(r.interfaces))
+                var pairing = false
+                if case let .bonjour(txt) = r.metadata { if let v = txt.dictionary["id"] { id = v }; pairing = txt.dictionary["pair"] == "1" }
+                f[id] = Found(id: id, name: name, endpoint: r.endpoint, ifaces: Array(r.interfaces), pairing: pairing)
             }
             DispatchQueue.main.async { dlog("tx browse: \(f.count) found"); if let s = self, Set(f.keys) != Set(s.found.keys) { s.badIface.removeAll() }; self?.found = f; self?.tick() }
         }
@@ -233,7 +234,7 @@ import SwiftUI
     }
 
     // MARK: sessions
-    func tick() { tickPrimary(); tickExtras() }
+    func tick() { tickPrimary(); tickExtras(); considerPairing() }
 
     func tickPrimary() {
         guard enabled, session == nil else { return }
@@ -264,6 +265,7 @@ import SwiftUI
         }
         let s = Session(endpoint: endpoint, keys: keys, name: myName, code: code, preset: presets[autoQ ? effIdx : qualityMode], mirror: mirrorOn)
         s.onVersion = { [weak self] v in self?.checkVersion(v) }
+        s.onNumber = { [weak self, weak s] n, answer in self?.askNumber(s?.hs.peerName ?? "the other Mac", n, answer) }
         s.audioOn = audioOn; s.forceIface = iface
         s.onPaired = { [weak self] peer in
             if let me = self { if let t = me.targetID, t != peer.id, !me.extraIDs.contains(t) { me.extraIDs += [t] }; me.extraIDs.removeAll { $0 == peer.id }; me.targetID = peer.id }   // a newly paired Mac joins the ones already in use
@@ -281,7 +283,7 @@ import SwiftUI
             if self.session === s { self.session = nil }
             if !s.live, let i = s.forceIface, reason != "Restarting", reason != "Sleeping", reason != "PERMISSION", s.pairCode == nil, Date().timeIntervalSince(s.startedAt) >= 3 { self.badIface[i.name] = Date().addingTimeInterval(20) }
             if self.wasLive { self.wasLive = false; if reason != "Restarting" && reason != "Sleeping" { self.notify("Display disconnected", reason ?? "Receiver went away") } }
-            if s.pairCode != nil && !s.hs.pairedNow, let r = reason, r != "Restarting" {
+            if s.pairCode != nil && !s.hs.pairedNow, let r = reason, r != "Restarting", r != "Pairing cancelled" {
                 self.alert("Pairing failed", r)
             }
             if reason == "PERMISSION" { self.permissionProblem = true; self.status = "Needs Screen Recording permission"; self.notify("Needs permission", "Allow Screen Recording in System Settings.") }
@@ -448,7 +450,7 @@ import SwiftUI
     func reencode() { if let s = session { s.setPreset(s.preset, force: true) }; for e in extras.values { e.setPreset(e.preset, force: true) } }
     func restartSession() { endAll("Restarting"); status = "Looking for receiver…"; tick() }
     func selectReceiver(_ id: String) { targetID = id; endAll("Restarting"); tick() }
-    func pairReceiver(_ id: String) { if let f = found[id] { askCode(title: "Pair with \(f.name)", endpoint: f.endpoint) } }
+    func pairReceiver(_ id: String) { if let f = found[id] { offerPair(f, userAsked: true) } }
     func forgetReceiver(_ id: String) {
         keys.forget(id: id); extraIDs = extraIDs.filter { $0 != id }; extras[id]?.end("Restarting")
         if targetID == id { targetID = extraIDs.first; extraIDs = Array(extraIDs.dropFirst()); session?.end("Restarting") }
@@ -505,40 +507,63 @@ import SwiftUI
         if keys.peer(id: id) != nil {
             toggleUse(id)
         } else if let f = found[id] {
-            askCode(title: "Pair with \(f.name)", endpoint: f.endpoint)
+            offerPair(f, userAsked: true)
         }
     }
-    func askCode(title: String, endpoint: NWEndpoint) {
-        let a = NSAlert(); a.messageText = title
-        a.informativeText = "On the receiver Mac, open its menu bar icon › Pair new Mac…, then type the code it shows."
-        let f = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24)); f.placeholderString = "XXXXX-XXXXX"
-        a.accessoryView = f
+    // MARK: pairing (first time): receiver says "ready to pair" -> we offer -> both Macs show the same number
+    var pairPromptOpen = false
+    var pairDismissed: [String: Date] = [:]
+
+    /// A receiver that is waiting to be paired shows up on its own: offer to pair, no menu digging.
+    func considerPairing() {
+        guard !pairPromptOpen, session?.pairCode == nil else { return }
+        for f in found.values.sorted(by: { $0.name < $1.name }) where f.pairing && keys.peer(id: f.id) == nil {
+            if let d = pairDismissed[f.id], Date().timeIntervalSince(d) < 120 { continue }
+            offerPair(f, userAsked: false); return
+        }
+    }
+
+    func offerPair(_ f: Found, userAsked: Bool) {
+        pairPromptOpen = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let a = NSAlert(); a.messageText = "Pair with \(f.name)?"
+            a.informativeText = userAsked ? "Make sure AirDisplay is open on \(f.name) and set to “Be the extra screen”." : "\(f.name) is waiting to be paired. Click Pair, then check that both Macs show the same number."
+            a.addButton(withTitle: "Pair"); a.addButton(withTitle: "Not now")
+            NSApp.activate(ignoringOtherApps: true)
+            let go = a.runModal() == .alertFirstButtonReturn
+            self.pairPromptOpen = false
+            if go { self.session?.end("Restarting"); self.startSession(f.endpoint, code: "pair") }
+            else { self.pairDismissed[f.id] = Date() }
+        }
+    }
+
+    func askNumber(_ name: String, _ number: String, _ answer: @escaping (Bool) -> Void) {
+        let a = NSAlert(); a.messageText = "Check the number on \(name)"
+        a.informativeText = "\(name) should show exactly this number. If it matches, click Pair on both Macs."
+        let n = NSTextField(labelWithString: number); n.font = .monospacedSystemFont(ofSize: 44, weight: .semibold); n.alignment = .center
+        n.frame = NSRect(x: 0, y: 0, width: 260, height: 56); a.accessoryView = n
         a.addButton(withTitle: "Pair"); a.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
-        a.window.initialFirstResponder = f
-        if a.runModal() == .alertFirstButtonReturn, !Code.normalize(f.stringValue).isEmpty {
-            endAll("Restarting")
-            startSession(endpoint, code: f.stringValue)
-        }
+        answer(a.runModal() == .alertFirstButtonReturn)
     }
+
     @objc func pairByAddress() {
         let a = NSAlert(); a.messageText = "Pair by address"
-        a.informativeText = "Use if the receiver isn't listed. Enter its IP address and the code shown on it."
-        let v = NSStackView(frame: NSRect(x: 0, y: 0, width: 240, height: 54)); v.orientation = .vertical; v.spacing = 6
-        let h = NSTextField(frame: .zero); h.placeholderString = "IP address, e.g. 10.0.0.2"
-        let c = NSTextField(frame: .zero); c.placeholderString = "XXXXX-XXXXX"
-        v.addArrangedSubview(h); v.addArrangedSubview(c); a.accessoryView = v
+        a.informativeText = "Use if the other Mac isn't listed. Enter its IP address. It must be open in “Be the extra screen” mode and ready to pair."
+        let h = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24)); h.placeholderString = "IP address, e.g. 10.0.0.2"
+        a.accessoryView = h
         a.addButton(withTitle: "Pair"); a.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
-        if a.runModal() == .alertFirstButtonReturn, !h.stringValue.isEmpty, !Code.normalize(c.stringValue).isEmpty {
+        if a.runModal() == .alertFirstButtonReturn, !h.stringValue.isEmpty {
             fallbackHost = h.stringValue.trimmingCharacters(in: .whitespaces)
-            endAll("Restarting")
-            startSession(.hostPort(host: NWEndpoint.Host(fallbackHost!), port: 7777), code: c.stringValue)
+            session?.end("Restarting")
+            startSession(.hostPort(host: NWEndpoint.Host(fallbackHost!), port: 7777), code: "pair")
         }
     }
     @objc func forgetAll() {
         let a = NSAlert(); a.messageText = "Forget all paired receivers?"
-        a.informativeText = "You'll need to pair again with a new code."
+        a.informativeText = "You'll need to pair them again."
         a.addButton(withTitle: "Forget"); a.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
         if a.runModal() == .alertFirstButtonReturn { keys.forgetAll(); targetID = nil; extraIDs = []; endAll("Restarting") }

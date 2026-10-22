@@ -50,7 +50,9 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     // pairing window
     let codeLock = NSLock()
-    var pairCode: String?, pairExpires = Date.distantPast, attempts = 0
+    var pairExpires = Date.distantPast
+    var pairingOpen: Bool { codeLock.lock(); defer { codeLock.unlock() }; return Date() < pairExpires }
+    var pairConn: RxConn?, pairBox: NSStackView?
     var pairPanel: NSPanel?, pairLabel: NSTextField?, pairTimer: Timer?
 
     func applicationWillTerminate(_ n: Notification) { CGAssociateMouseAndMouseCursorPosition(1) }
@@ -69,12 +71,16 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     // MARK: network
+    func service() -> NWListener.Service {
+        NWListener.Service(type: "_odisplay._tcp", txtRecord: NWTXTRecord(["id": keys.myID, "v": "1", "pair": pairingOpen ? "1" : "0"]))
+    }
+    func advertise() { listener?.service = service() }   // tells main Macs we're ready to pair (or not)
     func startListener() {
         dlog("rx startListener")
         let tcp = NWProtocolTCP.Options(); tcp.noDelay = true
         tcp.enableKeepalive = true; tcp.keepaliveIdle = 3; tcp.keepaliveInterval = 1; tcp.keepaliveCount = 3
         guard let l = try? NWListener(using: NWParameters(tls: nil, tcp: tcp), on: 7777) else { print("listen fail"); retryListener(); return }
-        l.service = NWListener.Service(type: "_odisplay._tcp", txtRecord: NWTXTRecord(["id": keys.myID, "v": "1"]))
+        l.service = service()
         l.newConnectionHandler = { [weak self] c in self?.accept(c) }
         l.stateUpdateHandler = { [weak self, weak l] st in
             print("listener:", st); dlog("rx listener \(st)")
@@ -89,21 +95,12 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
     }
 
-    func currentCode() -> String? {
-        codeLock.lock(); defer { codeLock.unlock() }
-        guard let c = pairCode, Date() < pairExpires, attempts > 0 else { return nil }
-        return c
-    }
-
     func accept(_ c: NWConnection) {
         dlog("rx accept \(c.endpoint)")
         let hs = Handshake(role: .server, keys: keys, name: myName)
-        hs.serverCode = { [weak self] in self?.currentCode() }
-        hs.serverAttemptFailed = { [weak self] in
-            guard let self = self else { return }
-            self.codeLock.lock(); self.attempts -= 1; self.codeLock.unlock()
-        }
+        hs.serverPairOpen = { [weak self] in self?.pairingOpen ?? false }
         let rc = RxConn(c, hs)
+        hs.onNumber = { [weak self, weak rc] n in DispatchQueue.main.async { if let rc = rc { self?.showPairRequest(rc, n) } } }
         c.stateUpdateHandler = { [weak self] st in
             switch st {
             case .failed, .cancelled: DispatchQueue.main.async { if self?.active === rc { self?.hideWindow() } }
@@ -112,7 +109,8 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         c.start(queue: q)
         recv(rc)
-        q.asyncAfter(deadline: .now() + 6) { if !rc.authed { rc.c.cancel() } }
+        q.asyncAfter(deadline: .now() + 6) { if !rc.authed && !rc.hs.pairMode { rc.c.cancel() } }
+        q.asyncAfter(deadline: .now() + 120) { if !rc.authed { rc.c.cancel() } }
     }
 
     func recv(_ rc: RxConn) {
@@ -140,10 +138,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                     do {
                         let replies = try rc.hs.receive(t, Data(body.dropFirst()))
                         for r in replies { sendPlain(rc, r.0, r.1) }
-                        if rc.hs.completed {
-                            rc.chan = rc.hs.channel; rc.authed = true
-                            DispatchQueue.main.async { self.activate(rc) }
-                        }
+                        if rc.hs.completed { finish(rc) }
                     } catch let e as WireError {
                         print("handshake rejected:", e.msg)
                         sendPlain(rc, MT.reject, Data(e.msg.utf8))
@@ -153,6 +148,11 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 }
             }
         } catch { rc.c.cancel() }
+    }
+
+    func finish(_ rc: RxConn) {
+        rc.chan = rc.hs.channel; rc.authed = true
+        DispatchQueue.main.async { if rc.hs.pairedNow { self.closePairing() }; self.activate(rc) }
     }
 
     func secure(_ rc: RxConn, _ t: UInt8, _ p: Data) {
@@ -443,40 +443,91 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func resume() { dlog("rx resume"); paused = false; item.button?.image = menuGlyph(filled: false, back: true); startListener() }
 
     // MARK: pairing UI
+    func label(_ t: String, size: CGFloat = 13, weight: NSFont.Weight = .regular, color: NSColor = .labelColor, width: CGFloat = 380) -> NSTextField {
+        let f = NSTextField(wrappingLabelWithString: t); f.font = .systemFont(ofSize: size, weight: weight); f.textColor = color
+        f.alignment = .center; f.preferredMaxLayoutWidth = width; return f
+    }
+
     func openPairing() {
         if paused { resume() }
-        codeLock.lock(); pairCode = Code.generate(); pairExpires = Date().addingTimeInterval(120); attempts = 5; let code = pairCode!; codeLock.unlock()
+        codeLock.lock(); pairExpires = Date().addingTimeInterval(300); codeLock.unlock()
+        advertise()
         pairPanel?.close()
-        let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 340), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        p.title = "Pair a Mac"; p.level = .floating; p.isReleasedWhenClosed = false; p.delegate = self
-        let t0 = NSTextField(labelWithString: "Pair with your main Mac"); t0.font = .systemFont(ofSize: 17, weight: .bold)
-        let t1 = NSTextField(wrappingLabelWithString: "1. On your main Mac, open AirDisplay (the menu-bar icon).\n2. Choose Receiver › “\(myName)”.\n3. Type this code when asked:")
-        t1.font = .systemFont(ofSize: 13); t1.preferredMaxLayoutWidth = 390
-        let c = NSTextField(labelWithString: code)
-        c.font = .monospacedSystemFont(ofSize: 40, weight: .semibold); c.alignment = .center
-        let l = NSTextField(labelWithString: "Expires in 2:00"); l.textColor = .secondaryLabelColor; l.font = .systemFont(ofSize: 12)
-        let t2 = NSTextField(wrappingLabelWithString: "Both Macs must be on the same network or cabled together. If macOS asks about Local Network access, click Allow."); t2.font = .systemFont(ofSize: 11); t2.textColor = .secondaryLabelColor; t2.preferredMaxLayoutWidth = 390
-        let s = NSStackView(views: [t0, t1, c, l, t2]); s.orientation = .vertical; s.spacing = 14; s.alignment = .centerX
-        s.edgeInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
-        p.contentView = s
+        let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 300), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        p.title = "Pair with your main Mac"; p.level = .floating; p.isReleasedWhenClosed = false; p.delegate = self
+        pairPanel = p
+        showPairWaiting()
         p.center(); NSApp.activate(ignoringOtherApps: true); p.makeKeyAndOrderFront(nil)
-        pairPanel = p; pairLabel = l
         pairTimer?.invalidate()
         pairTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
+            if !self.pairingOpen { self.closePairing(); return }
             let left = Int(self.pairExpires.timeIntervalSinceNow)
-            if left <= 0 || self.currentCode() == nil { self.closePairing(); return }
-            self.pairLabel?.stringValue = String(format: "Expires in %d:%02d", left / 60, left % 60)
+            self.pairLabel?.stringValue = String(format: "Ready to pair · closes in %d:%02d", left / 60, left % 60)
         }
     }
+
+    func setPanel(_ views: [NSView]) {
+        guard let p = pairPanel else { return }
+        let s = NSStackView(views: views); s.orientation = .vertical; s.spacing = 14; s.alignment = .centerX
+        s.edgeInsets = NSEdgeInsets(top: 26, left: 24, bottom: 24, right: 24)
+        p.contentView = s; p.setContentSize(s.fittingSize); pairBox = s
+    }
+
+    func showPairWaiting() {
+        let spin = NSProgressIndicator(); spin.style = .spinning; spin.controlSize = .small; spin.startAnimation(nil)
+        let l = label("Ready to pair · closes in 5:00", size: 12, color: .secondaryLabelColor); pairLabel = l
+        setPanel([label("This Mac is ready", size: 18, weight: .bold),
+                  label("On your main Mac, open AirDisplay. It will ask “Pair with \(myName)?”. Click Pair there, then check the number here."),
+                  spin, l,
+                  label("Both Macs need to be on the same network, or cabled together. If macOS asks about Local Network access, click Allow.", size: 11, color: .secondaryLabelColor)])
+    }
+
+    /// A main Mac connected in pairing mode: show its name and the 6-digit number, ask for a click.
+    func showPairRequest(_ rc: RxConn, _ number: String) {
+        guard pairingOpen else { rc.c.cancel(); return }
+        if let other = pairConn, other !== rc { sendPlain(rc, MT.reject, Data("busy".utf8)); q.asyncAfter(deadline: .now() + 0.3) { rc.c.cancel() }; return }
+        pairConn = rc
+        if pairPanel == nil { pairPanel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 300), styleMask: [.titled, .closable], backing: .buffered, defer: false); pairPanel?.title = "Pair with your main Mac"; pairPanel?.level = .floating; pairPanel?.isReleasedWhenClosed = false; pairPanel?.delegate = self; pairPanel?.center() }
+        let num = NSTextField(labelWithString: number); num.font = .monospacedSystemFont(ofSize: 48, weight: .semibold); num.alignment = .center
+        let ok = NSButton(title: "Pair", target: self, action: #selector(pairAccept)); ok.keyEquivalent = "\r"; ok.bezelStyle = .rounded
+        let no = NSButton(title: "Cancel", target: self, action: #selector(pairDecline)); no.bezelStyle = .rounded
+        let row = NSStackView(views: [no, ok]); row.spacing = 12
+        setPanel([label("“\(rc.hs.peerName)” wants to pair", size: 18, weight: .bold),
+                  label("Check that your main Mac shows this same number, then click Pair on both Macs."),
+                  num, row,
+                  label("If the numbers differ, or you didn't start this, click Cancel.", size: 11, color: .secondaryLabelColor)])
+        NSApp.activate(ignoringOtherApps: true); pairPanel?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc func pairAccept() { decidePair(true) }
+    @objc func pairDecline() { decidePair(false) }
+    func decidePair(_ ok: Bool) {
+        guard let rc = pairConn else { return }
+        pairConn = nil
+        rc.sendQ.async { [weak self] in
+            guard let self = self else { return }
+            do {
+                let replies = try rc.hs.serverDecision(ok)
+                for r in replies { self.sendPlain(rc, r.0, r.1) }
+                if rc.hs.completed { self.finish(rc) }
+            } catch {
+                self.sendPlain(rc, MT.reject, Data("declined".utf8))
+                self.q.asyncAfter(deadline: .now() + 0.3) { rc.c.cancel() }
+            }
+        }
+        if !ok { DispatchQueue.main.async { if self.pairingOpen { self.showPairWaiting() } } }
+    }
+
     func closePairing() {
-        codeLock.lock(); pairCode = nil; codeLock.unlock()
+        codeLock.lock(); pairExpires = .distantPast; codeLock.unlock()
+        advertise()
         pairTimer?.invalidate(); pairTimer = nil
-        pairPanel?.close(); pairPanel = nil
+        if let rc = pairConn { pairConn = nil; rc.c.cancel() }
+        let p = pairPanel; pairPanel = nil; p?.close()
     }
     func windowWillClose(_ n: Notification) {
-        codeLock.lock(); pairCode = nil; codeLock.unlock()
-        pairTimer?.invalidate(); pairTimer = nil
+        if (n.object as? NSPanel) === pairPanel { codeLock.lock(); pairExpires = .distantPast; codeLock.unlock(); advertise(); pairTimer?.invalidate(); pairTimer = nil; if let rc = pairConn { pairConn = nil; rc.c.cancel() } }
     }
 
     // MARK: menu

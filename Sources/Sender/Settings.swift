@@ -363,7 +363,7 @@ import UserNotifications
                 }
             }
             Section("Security") {
-                Text("Every session is encrypted end to end. A receiver must be paired once with a code shown on its screen, and the Macs verify each other's key on every connection.")
+                Text("Every session is encrypted end to end. A receiver must be paired once: both Macs show the same 6-digit number and you click Pair on each, and the Macs verify each other's key on every connection.")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }

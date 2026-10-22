@@ -143,7 +143,7 @@ import Cocoa
             StepCard(number: 2, heading: "Allow Screen Recording", info:
                 "macOS requires this permission before an app can capture a display.\n\nThe app only captures its own virtual display. Nothing is stored, and everything sent to the other Mac is encrypted.\n\nIf macOS also asks about Local Network access, click Allow: it is how the two Macs find each other."),
             StepCard(number: 3, heading: "Pair the two Macs", info:
-                "Pairing is done once.\n\nThe other Mac shows a 10-character code. Type it here. The Macs then remember each other, and no one else on your network can connect without that code.\n\nAfter pairing, they reconnect on their own."),
+                "Pairing is done once.\n\nThe other Mac says it is ready to pair and a window here asks to pair with it. Click Pair on both Macs after checking they show the same 6-digit number. The Macs then remember each other, and no one else on your network can pair without you being at both Macs.\n\nAfter pairing, they reconnect on their own."),
             StepCard(number: 4, heading: "Connect", info:
                 "This creates a virtual display sized to the other Mac's screen. Drag windows onto it like any monitor.\n\nFor the lowest lag use an Ethernet or Thunderbolt cable. Wi-Fi works, but quality is lowered automatically (Quality › Auto)."),
         ]
@@ -185,7 +185,7 @@ import Cocoa
                      button: names.isEmpty && receiverApp() != nil ? "Show app to copy" : nil, state: st(0))
         cards[1].set(perm ? "Allowed" : "Click Allow, then switch on “AirDisplay” in the list that opens.", button: "Allow…", state: st(1))
         if let p = paired { cards[2].set("Paired with \(p.name)", state: st(2)) }
-        else if let f = unpaired { cards[2].set("Enter the code shown on \(f.name)'s screen.", button: "Enter Code…", state: st(2)) }
+        else if let f = unpaired { cards[2].set("\(f.name) is ready. Click Pair, then check both Macs show the same number.", button: "Pair…", state: st(2)) }
         else { cards[2].set("Waiting for the other Mac to appear.", state: st(2)) }
         if live { cards[3].set("Connected to \(app.session?.receiverName ?? "receiver") over \(app.session?.linkType ?? "network")", state: st(3)) }
         else { cards[3].set(app.status, button: "Connect Now", state: st(3)) }
@@ -199,7 +199,7 @@ import Cocoa
     @objc func revealReceiver() { if let u = receiverApp() { NSWorkspace.shared.activateFileViewerSelecting([u]) } }
     @objc func grantPermission() { _ = CGRequestScreenCaptureAccess(); app.openPrivacy() }
     @objc func pair() {
-        if let f = app.found.values.first(where: { app.keys.peer(id: $0.id) == nil }) { app.askCode(title: "Pair with \(f.name)", endpoint: f.endpoint) }
+        if let f = app.found.values.first(where: { app.keys.peer(id: $0.id) == nil }) { app.offerPair(f, userAsked: true) }
     }
     @objc func connectNow() { app.enabled = true; app.tick() }
     @objc func finish() { win?.close() }

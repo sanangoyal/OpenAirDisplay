@@ -53,6 +53,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
     var deframer = Deframer()
     var receiverName = "iMac"
     var lastPongAt = Date()
+    var onNumber: ((String, @escaping (Bool) -> Void) -> Void)?   // pairing: show the 6-digit number, user answers yes/no
     var onVersion: ((String) -> Void)?
     var capW = 0, capH = 0, backW = 0, backH = 0
 
@@ -87,6 +88,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
         self.endpoint = endpoint; self.keys = keys; self.pairCode = code; self.preset = preset; self.mirror = mirror
         hs = Handshake(role: .client, keys: keys, name: name)
         hs.clientCode = code
+        hs.onNumber = { [weak self] n in DispatchQueue.main.async { guard let self = self, !self.ended else { return }; self.onNumber?(n) { ok in self.pairDecision(ok) } } }
         out.s = self
     }
 
@@ -129,6 +131,11 @@ func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
             dlog("tx connect timeout state=\(self.conn.state)")
             self.end(nil)
         }
+    }
+
+    func pairDecision(_ ok: Bool) {
+        guard !ended else { return }
+        do { for m in try hs.clientDecision(ok) { sendPlain(m.0, m.1) } } catch { fail("Pairing cancelled") }
     }
 
     func fail(_ reason: String?) { DispatchQueue.main.async { self.end(reason) } }

@@ -25,7 +25,7 @@ Got a 5K iMac gathering dust, or a Mac mini on a spare monitor? Install the same
 - **Sound.** Optionally plays the main Mac's audio on the extra screen's speakers.
 - **Wake-on-LAN.** Wake a sleeping extra screen from the menu or automatically.
 - **One app, two roles.** Pick "Use another Mac as my display" or "Be the extra screen" at first launch. Change it any time in Settings.
-- **Private.** Direct connection between your two Macs. No servers, no telemetry, no accounts. Pairing uses a one-time 10-character code; after that each Mac only talks to the Mac it paired with, and everything on the wire is encrypted.
+- **Private.** Direct connection between your two Macs. No servers, no telemetry, no accounts. Pairing is a one-time step: both Macs show the same 6-digit number and you click Pair on each (so a stranger on your Wi-Fi can't pair); after that each Mac only talks to the Mac it paired with, and everything on the wire is encrypted.
 - **Live stats.** Frame rate, bit rate, ping and drops in the menu and in Settings.
 
 ## Requirements
@@ -59,8 +59,8 @@ SIGN_ID="My Local Signing" scripts/build.sh --install
 
 ## Set up
 
-1. Open AirDisplay on the **extra screen** Mac and choose **Be the extra screen**. A pairing code appears.
-2. Open AirDisplay on your **main Mac** and choose **Use another Mac as my display**. Follow the setup guide: allow Screen Recording, pick the other Mac, type the code.
+1. Open AirDisplay on the **extra screen** Mac and choose **Be the extra screen**. It says it is ready to pair.
+2. Open AirDisplay on your **main Mac** and choose **Use another Mac as my display**. It asks “Pair with …?”. Click Pair, check that both Macs show the same 6-digit number, and click Pair on each. Allow Screen Recording when asked.
 3. Done. After the first pairing, they reconnect by themselves.
 
 Press **Esc** on the extra screen to pause and use that Mac normally.
@@ -86,7 +86,7 @@ Use a cable if you can. Also, with AirDrop set to "Everyone", macOS periodically
 It should work on macOS 13+, but it is untested. Reports welcome.
 
 **Is the connection encrypted?**
-Yes. Ed25519 identity keys are pinned at pairing, session keys come from X25519, and frames are sealed with AES-GCM. This is a hobby project and has not had an independent security audit.
+Yes. Ed25519 identity keys are pinned at pairing, session keys come from X25519, and frames are sealed with AES-GCM. The pairing number is a short authentication string with a commit-reveal step, so someone in the middle can't pick keys that make the numbers match (about a 1 in a million chance per attempt). This is a hobby project and has not had an independent security audit.
 
 ## Limitations
 
