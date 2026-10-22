@@ -266,6 +266,7 @@ final class Ladder {
 
     // MARK: sessions
     func tick() {
+        ctlServer?.sync()   // honours the agent-control switch even when it was changed from outside the app
         // Without Screen Recording permission every connection attempt fails and flickers the receiver: wait until it is granted.
         if permissionProblem && CGPreflightScreenCaptureAccess() { permissionProblem = false }
         if permissionProblem && enabled { status = "Needs Screen Recording permission"; refreshIcon(); considerPairing(); return }

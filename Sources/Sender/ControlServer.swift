@@ -64,7 +64,7 @@ func peerName(_ fd: Int32) -> String {
     }
 
     func stop() {
-        guard fd >= 0 else { return }
+        if fd < 0 { unlink(Ctl.sockPath); return }   // also removes a stale file left by a crashed run
         src?.cancel(); src = nil
         close(fd); fd = -1
         unlink(Ctl.sockPath)
