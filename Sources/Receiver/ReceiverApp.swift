@@ -176,7 +176,7 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if let num = scr?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID, let m = CGDisplayCopyDisplayMode(num) {
             w = max(w, m.pixelWidth); h = max(h, m.pixelHeight)
         }
-        let info: [String: Any] = ["name": myName, "w": w, "h": h, "macs": macAddresses(), "ver": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"]
+        let info: [String: Any] = ["name": myName, "w": w, "h": h, "macs": macAddresses(), "hevc": VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC), "ver": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"]
         sendSecure(rc, MT.info, (try? JSONSerialization.data(withJSONObject: info)) ?? Data())
     }
 
@@ -236,7 +236,8 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     var decoded: UInt32 = 0
     func config(_ p: Data) {
         var o = 1; var sets: [Data] = []
-        for _ in 0..<Int(p[0]) {
+        let isHEVC = p[0] & 0x80 != 0
+        for _ in 0..<Int(p[0] & 0x7F) {
             let l = Int(p[o]) << 8 | Int(p[o + 1]); o += 2
             sets.append(p.subdata(in: o..<(o + l))); o += l
         }
@@ -246,8 +247,11 @@ final class ReceiverApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             d.copyBytes(to: m, count: d.count); ptrs.append(UnsafePointer(m)); sizes.append(d.count)
         }
         var out: CMVideoFormatDescription?
-        let r = CMVideoFormatDescriptionCreateFromH264ParameterSets(allocator: kCFAllocatorDefault, parameterSetCount: ptrs.count,
-            parameterSetPointers: ptrs, parameterSetSizes: sizes, nalUnitHeaderLength: 4, formatDescriptionOut: &out)
+        let r: OSStatus = isHEVC
+            ? CMVideoFormatDescriptionCreateFromHEVCParameterSets(allocator: kCFAllocatorDefault, parameterSetCount: ptrs.count, parameterSetPointers: ptrs,
+                parameterSetSizes: sizes, nalUnitHeaderLength: 4, extensions: nil, formatDescriptionOut: &out)
+            : CMVideoFormatDescriptionCreateFromH264ParameterSets(allocator: kCFAllocatorDefault, parameterSetCount: ptrs.count,
+                parameterSetPointers: ptrs, parameterSetSizes: sizes, nalUnitHeaderLength: 4, formatDescriptionOut: &out)
         ptrs.forEach { $0.deallocate() }
         if r == noErr { fd = out }
     }

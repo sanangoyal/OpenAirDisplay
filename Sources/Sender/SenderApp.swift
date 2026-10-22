@@ -11,7 +11,8 @@ import SwiftUI
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     let keys = Keys(appDir: "AirDisplay")
     let myName = Host.current().localizedName ?? "MacBook"
-    var session: Session?
+    var session: Session?                 // primary receiver (targetID)
+    var extras: [String: Session] = [:]   // additional receivers used at the same time
     var browser: NWBrowser?
     var found: [String: Found] = [:]
     var status = "Looking for receiver…"
@@ -46,7 +47,7 @@ import SwiftUI
         let m = NSMenu(); m.delegate = self; m.autoenablesItems = false; item.menu = m
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.tick() }
         let nc = NSWorkspace.shared.notificationCenter
-        nc.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.session?.end("Sleeping") }
+        nc.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.endAll("Sleeping") }
         nc.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.tick() }
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().setNotificationCategories([UNNotificationCategory(identifier: "SWITCH", actions: [UNNotificationAction(identifier: "switch", title: "Switch now", options: [.foreground])], intentIdentifiers: [], options: [])])
@@ -110,7 +111,7 @@ import SwiftUI
     // MARK: quality
     func applyQuality(_ idx: Int, why: String?) {
         effIdx = idx; lastChange = Date(); badSecs = 0; goodSecs = 0
-        session?.setPreset(presets[idx])
+        session?.setPreset(presets[idx]); for e in extras.values { e.setPreset(presets[idx]) }
         if let w = why { notify("Display quality: \(presets[idx].short)", w) }
     }
 
@@ -165,7 +166,7 @@ import SwiftUI
               let b = bestRank(f), b < rankOf(link: s.linkType) else { return nil }
         return b == 0 ? "Thunderbolt" : "Ethernet"
     }
-    func switchNow() { session?.end("Restarting"); tick() }
+    func switchNow() { endAll("Restarting"); tick() }
     func notifySwitch(_ what: String) {
         guard notifOn else { return }
         let c = UNMutableNotificationContent(); c.title = "\(what) available"
@@ -178,11 +179,63 @@ import SwiftUI
         }
         h()
     }
-    @objc func pickLink(_ s: NSMenuItem) { linkMode = s.tag; session?.end("Restarting"); status = "Looking for receiver…"; tick() }
+    @objc func pickLink(_ s: NSMenuItem) { linkMode = s.tag; endAll("Restarting"); status = "Looking for receiver…"; tick() }
     @objc func switchFromMenu() { switchNow() }
 
+    // MARK: several receivers at once
+    /// Extra screens used together with the primary one. Each gets its own virtual display and its own stream.
+    var extraIDs: [String] { get { defaults.stringArray(forKey: "extraIDs") ?? [] } set { defaults.set(newValue, forKey: "extraIDs") } }
+    var usedIDs: [String] { (targetID.map { [$0] } ?? []) + extraIDs.filter { $0 != targetID } }
+    func name(of id: String) -> String { found[id]?.name ?? keys.peer(id: id)?.name ?? "receiver" }
+
+    func endAll(_ reason: String?) { session?.end(reason); for s in Array(extras.values) { s.end(reason) } }
+
+    func toggleUse(_ id: String) {
+        if usedIDs.contains(id) {
+            if id == targetID { targetID = extraIDs.first; extraIDs = Array(extraIDs.dropFirst()); session?.end("Restarting") }
+            else { extraIDs = extraIDs.filter { $0 != id }; extras[id]?.end("Restarting") }
+        } else if targetID == nil { targetID = id }
+        else { extraIDs = extraIDs + [id] }
+        status = "Looking for receiver…"; tick()
+    }
+
+    func tickExtras() {
+        guard enabled else { return }
+        for id in extraIDs where id != targetID && extras[id] == nil {
+            guard keys.peer(id: id) != nil, let f = found[id] else { continue }
+            let c = candidates(f)
+            if c.isEmpty && !f.ifaces.isEmpty { continue }
+            startExtra(id, f, iface: c.first)
+        }
+    }
+
+    func startExtra(_ id: String, _ f: Found, iface: NWInterface?) {
+        dlog("tx startExtra \(f.name) iface=\(iface?.name ?? "-")")
+        let s = Session(endpoint: f.endpoint, keys: keys, name: myName, code: nil, preset: presets[autoQ ? effIdx : qualityMode], mirror: mirrorOn)
+        s.onVersion = { [weak self] v in self?.checkVersion(v) }
+        s.audioOn = false; s.forceIface = iface          // sound goes to the primary receiver only
+        s.onLive = { [weak self, weak s] in
+            self?.notify("Connected to \(s?.receiverName ?? f.name)", "Extra display · \(s?.preset.short ?? "")")
+            self?.refreshIcon()
+        }
+        var wasLive = false
+        s.onEnd = { [weak self, weak s] reason in
+            guard let self = self, let s = s else { return }
+            dlog("tx extra end \(f.name): \(reason ?? "nil") live=\(s.live)")
+            if self.extras[id] === s { self.extras[id] = nil }
+            if s.live { wasLive = true }
+            if wasLive, reason != "Restarting", reason != "Sleeping" { self.notify("\(f.name) disconnected", reason ?? "Receiver went away") }
+            if reason == "PERMISSION" { self.permissionProblem = true }
+            self.refreshIcon()
+        }
+        extras[id] = s
+        s.start()
+    }
+
     // MARK: sessions
-    func tick() {
+    func tick() { tickPrimary(); tickExtras() }
+
+    func tickPrimary() {
         guard enabled, session == nil else { return }
         var ep: NWEndpoint?
         var iface: NWInterface?
@@ -213,7 +266,7 @@ import SwiftUI
         s.onVersion = { [weak self] v in self?.checkVersion(v) }
         s.audioOn = audioOn; s.forceIface = iface
         s.onPaired = { [weak self] peer in
-            self?.targetID = peer.id
+            if let me = self { if let t = me.targetID, t != peer.id, !me.extraIDs.contains(t) { me.extraIDs += [t] }; me.extraIDs.removeAll { $0 == peer.id }; me.targetID = peer.id }   // a newly paired Mac joins the ones already in use
             self?.notify("Paired with \(peer.name)", "Connecting…")
         }
         s.onLive = { [weak self, weak s] in
@@ -296,16 +349,16 @@ import SwiftUI
         let list = found.values.sorted { $0.name < $1.name }
         for f in list {
             let paired = keys.peer(id: f.id) != nil
-            act(r, f.name + (paired ? "" : "  — pair…"), #selector(pickReceiver(_:)), on: targetID == f.id, rep: f.id)
+            act(r, f.name + (paired ? "" : "  — pair…"), #selector(pickReceiver(_:)), on: usedIDs.contains(f.id), rep: f.id)
         }
         for p in keys.peers where found[p.id] == nil {
-            act(r, "\(p.name) (offline)", #selector(pickReceiver(_:)), on: targetID == p.id, rep: p.id)
+            act(r, "\(p.name) (offline)", #selector(pickReceiver(_:)), on: usedIDs.contains(p.id), rep: p.id)
         }
         if list.isEmpty && keys.peers.isEmpty { act(r, "No receivers found", nil, enabled: false) }
         r.addItem(.separator())
         act(r, "Pair by address…", #selector(pairByAddress))
-        let tname = targetID.flatMap { id in found[id]?.name ?? keys.peer(id: id)?.name } ?? "none"
-        let ri = NSMenuItem(title: "Receiver: \(tname)", action: nil, keyEquivalent: ""); ri.submenu = r; ri.isEnabled = true; menu.addItem(ri)
+        let tname = usedIDs.isEmpty ? "none" : usedIDs.map { name(of: $0) }.joined(separator: ", ")
+        let ri = NSMenuItem(title: usedIDs.count > 1 ? "Receivers: \(tname)" : "Receiver: \(tname)", action: nil, keyEquivalent: ""); ri.submenu = r; ri.isEnabled = true; menu.addItem(ri)
 
         if let t = targetID, found[t] == nil, canWake(t), session == nil, let p = keys.peer(id: t) { act(menu, "Wake \(p.name)", #selector(wakeFromMenu)) }
         let live = session?.stream != nil
@@ -376,8 +429,8 @@ import SwiftUI
         let s = session; let on = s?.stream != nil
         live.connected = on; live.status = status
         var rows: [RecvRow] = []
-        for f in found.values.sorted(by: { $0.name < $1.name }) { rows.append(RecvRow(id: f.id, name: f.name, paired: keys.peer(id: f.id) != nil, online: true, selected: targetID == f.id, canWake: false)) }
-        for p in keys.peers where found[p.id] == nil { rows.append(RecvRow(id: p.id, name: p.name, paired: true, online: false, selected: targetID == p.id, canWake: !(p.macs ?? []).isEmpty)) }
+        for f in found.values.sorted(by: { $0.name < $1.name }) { rows.append(RecvRow(id: f.id, name: f.name, paired: keys.peer(id: f.id) != nil, online: true, selected: usedIDs.contains(f.id), canWake: false)) }
+        for p in keys.peers where found[p.id] == nil { rows.append(RecvRow(id: p.id, name: p.name, paired: true, online: false, selected: usedIDs.contains(p.id), canWake: !(p.macs ?? []).isEmpty)) }
         live.rows = rows
         guard let s = s, on else { if !live.fpsH.isEmpty { live.clearHistory() }; return }
         live.receiver = s.receiverName; live.link = s.linkType; live.iface = s.iface
@@ -385,18 +438,21 @@ import SwiftUI
         live.looksLike = s.pointW > 0 ? "\(s.pointW)×\(s.pointH)" + (s.pointW < s.backW ? " @2x" : "") : "—"
         live.encoder = s.encInfo
         live.quality = autoQ ? "Auto · \(presets[effIdx].short)" : presets[qualityMode].short
-        live.fps = s.fps; live.target = effFps(s.capW, s.capH, s.preset.fps); live.mbps = s.mbps; live.rtt = s.rttMs; live.rxFps = s.rxFps
+        live.fps = s.fps; live.target = effFps(s.capW, s.capH, s.preset.fps, hevc: s.hevc); live.mbps = s.mbps; live.rtt = s.rttMs; live.rxFps = s.rxFps
         live.gb = Double(s.bytes) / 1e9; live.dropped = s.dropped
         let secs = Int(Date().timeIntervalSince(s.startedAt))
         live.uptime = String(format: "%d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60)
         live.push(fps: s.fps, mbps: s.mbps, rtt: s.rttMs)
     }
-    func setLinkMode(_ v: Int) { linkMode = v; session?.end("Restarting"); status = "Looking for receiver…"; tick() }
-    func reencode() { if let s = session { s.setPreset(s.preset, force: true) } }
-    func restartSession() { session?.end("Restarting"); status = "Looking for receiver…"; tick() }
-    func selectReceiver(_ id: String) { targetID = id; session?.end("Restarting"); tick() }
+    func setLinkMode(_ v: Int) { linkMode = v; endAll("Restarting"); status = "Looking for receiver…"; tick() }
+    func reencode() { if let s = session { s.setPreset(s.preset, force: true) }; for e in extras.values { e.setPreset(e.preset, force: true) } }
+    func restartSession() { endAll("Restarting"); status = "Looking for receiver…"; tick() }
+    func selectReceiver(_ id: String) { targetID = id; endAll("Restarting"); tick() }
     func pairReceiver(_ id: String) { if let f = found[id] { askCode(title: "Pair with \(f.name)", endpoint: f.endpoint) } }
-    func forgetReceiver(_ id: String) { keys.forget(id: id); if targetID == id { targetID = nil; session?.end("Restarting") } }
+    func forgetReceiver(_ id: String) {
+        keys.forget(id: id); extraIDs = extraIDs.filter { $0 != id }; extras[id]?.end("Restarting")
+        if targetID == id { targetID = extraIDs.first; extraIDs = Array(extraIDs.dropFirst()); session?.end("Restarting") }
+    }
     func diagnostics() -> String {
         var size = 0; sysctlbyname("hw.model", nil, &size, nil, 0)
         var m = [CChar](repeating: 0, count: max(size, 1)); sysctlbyname("hw.model", &m, &size, nil, 0)
@@ -419,7 +475,7 @@ import SwiftUI
             let keep = targetID
             if let b = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: b) }
             defaults.set(true, forKey: "onboarded"); targetID = keep
-            effIdx = 2; session?.end("Restarting"); settings?.win?.close(); settings = SettingsWindow(app: self)
+            effIdx = 2; endAll("Restarting"); settings?.win?.close(); settings = SettingsWindow(app: self)
         }
     }
 
@@ -427,7 +483,7 @@ import SwiftUI
     @objc func toggleEnabled() { setEnabled(!enabled) }
     func setEnabled(_ on: Bool) {
         enabled = on
-        if on { status = "Looking for receiver…"; tick() } else { session?.end(nil); status = "Paused" }
+        if on { status = "Looking for receiver…"; tick() } else { endAll(nil); status = "Paused" }
         refreshIcon()
     }
     @objc func pickQuality(_ s: NSMenuItem) { setQuality(s.tag) }
@@ -437,7 +493,7 @@ import SwiftUI
     }
     @objc func pickDisplay(_ s: NSMenuItem) {
         let m = s.tag == 1
-        if m != mirrorOn { mirrorOn = m; session?.end("Restarting") }
+        if m != mirrorOn { mirrorOn = m; endAll("Restarting") }
     }
     @objc func toggleAudio() { audioOn.toggle(); session?.audioOn = audioOn }
     @objc func toggleNotif() {
@@ -447,7 +503,7 @@ import SwiftUI
     @objc func pickReceiver(_ s: NSMenuItem) {
         guard let id = s.representedObject as? String else { return }
         if keys.peer(id: id) != nil {
-            targetID = id; session?.end("Restarting"); tick()
+            toggleUse(id)
         } else if let f = found[id] {
             askCode(title: "Pair with \(f.name)", endpoint: f.endpoint)
         }
@@ -461,7 +517,7 @@ import SwiftUI
         NSApp.activate(ignoringOtherApps: true)
         a.window.initialFirstResponder = f
         if a.runModal() == .alertFirstButtonReturn, !Code.normalize(f.stringValue).isEmpty {
-            session?.end("Restarting")
+            endAll("Restarting")
             startSession(endpoint, code: f.stringValue)
         }
     }
@@ -476,7 +532,7 @@ import SwiftUI
         NSApp.activate(ignoringOtherApps: true)
         if a.runModal() == .alertFirstButtonReturn, !h.stringValue.isEmpty, !Code.normalize(c.stringValue).isEmpty {
             fallbackHost = h.stringValue.trimmingCharacters(in: .whitespaces)
-            session?.end("Restarting")
+            endAll("Restarting")
             startSession(.hostPort(host: NWEndpoint.Host(fallbackHost!), port: 7777), code: c.stringValue)
         }
     }
@@ -485,7 +541,7 @@ import SwiftUI
         a.informativeText = "You'll need to pair again with a new code."
         a.addButton(withTitle: "Forget"); a.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
-        if a.runModal() == .alertFirstButtonReturn { keys.forgetAll(); targetID = nil; session?.end("Restarting") }
+        if a.runModal() == .alertFirstButtonReturn { keys.forgetAll(); targetID = nil; extraIDs = []; endAll("Restarting") }
     }
     @objc func showGuide() { guide?.show() }
     @objc func toggleLogin() {

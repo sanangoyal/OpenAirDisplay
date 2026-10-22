@@ -277,6 +277,7 @@ import UserNotifications
     @ObservedObject var live: Live
     @AppStorage("preset") var mode = -1
     @AppStorage("bitrateOn") var custom = false
+    @AppStorage("codec") var codec = "auto"
     @AppStorage("bitrateTarget") var target = 80
     var body: some View {
         Form {
@@ -288,6 +289,15 @@ import UserNotifications
                     }.labelsHidden().frame(width: 300)
                 }
                 Row(title: "Right now") { Text(live.connected ? live.quality : "—").foregroundStyle(.secondary) }
+            }
+            Section("Video codec") {
+                Row(title: "Codec", info: "HEVC gives a sharper picture at the same bit rate and has no 4K 60 fps limit, but the extra screen must decode it in hardware (newer Macs). Automatic uses HEVC when the extra screen supports it, otherwise H.264. Changes apply at the next connection.") {
+                    Picker("", selection: $codec) {
+                        Text("Automatic (recommended)").tag("auto")
+                        Text("H.264 only").tag("h264")
+                    }.labelsHidden().frame(width: 300)
+                }
+                Row(title: "Right now") { Text(live.connected ? live.encoder : "—").foregroundStyle(.secondary) }
             }
             Section("Bitrate") {
                 Row(title: "Custom bitrate", info: "Overrides the level's automatic bitrate. Higher is sharper on fast motion; wired links handle 100+ Mbps. Leave off unless you are tuning.") { Toggle("", isOn: $custom).labelsHidden() }
@@ -327,7 +337,7 @@ import UserNotifications
                 }
                 Row(title: "Current link") { Text(live.connected ? "\(live.link)" + (live.iface.isEmpty ? "" : " (\(live.iface))") : "—").foregroundStyle(.secondary) }
             }
-            Section("Receivers") {
+            Section("Receivers · use several at once") {
                 if live.rows.isEmpty { Text("No receivers found. Open “AirDisplay” on the other Mac.").foregroundStyle(.secondary) }
                 ForEach(live.rows) { r in
                     HStack(spacing: 8) {
@@ -338,7 +348,7 @@ import UserNotifications
                         Spacer()
                         if r.paired {
                             if !r.online && r.canWake { Button("Wake") { app.wakeReceiver(r.id) } }
-                            if !r.selected { Button("Use") { app.selectReceiver(r.id) } }
+                            Button(r.selected ? "Stop using" : "Use") { app.toggleUse(r.id) }
                             Button("Forget", role: .destructive) { app.forgetReceiver(r.id) }
                         } else if r.online {
                             Button("Pair…") { app.pairReceiver(r.id) }

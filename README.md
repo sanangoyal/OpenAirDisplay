@@ -18,6 +18,8 @@ Got a 5K iMac gathering dust, or a Mac mini on a spare monitor? Install the same
 - **Native resolution.** The virtual display matches the other Mac's panel, HiDPI included (4096×2304 on a 4K iMac).
 - **Low latency.** Hardware H.264 on both ends, tuned for speed. Ethernet or Thunderbolt cable is best; Wi-Fi works and quality adapts automatically.
 - **Automatic link choice.** Prefers wired when both are available, with a notification to switch if a cable appears mid-session. Or force Wired or Wi-Fi only.
+- **HEVC when available.** If the extra screen can decode HEVC in hardware (newer Macs), AirDisplay uses it automatically: sharper at the same bit rate and no 4K 60 fps cap. Older Macs stay on H.264.
+- **Several extra screens at once.** Pair more than one Mac and tick each one under Receivers; every one gets its own virtual display. Arrange them in System Settings › Displays. Sound goes to the first one.
 - **Quality presets.** Auto, Ultra, Best, Balanced, Light, plus a "Smooth 4K 60" mode for 60 Hz panels.
 - **Keyboard and mouse from the extra screen (opt-in).** Use the extra Mac's own keyboard and mouse to control the main Mac. Tap Esc is passed through; hold Esc for 1.5 s to leave. Pause from the main Mac any time with ⌃⌥⌘D.
 - **Sound.** Optionally plays the main Mac's audio on the extra screen's speakers.
@@ -78,7 +80,7 @@ macOS shows it whenever an app captures the screen. AirDisplay only captures its
 Use a cable if you can. Also, with AirDrop set to "Everyone", macOS periodically scans and can cause hitches; set it to Contacts Only. If macOS asked for Local Network access and you missed it, enable it in System Settings › Privacy & Security.
 
 **Why is 4K capped around 56 fps?**
-4096×2304 at 60 fps exceeds H.264 Level 5.2, and level 6 streams black-screen the hardware decoder on Intel iMacs. "Native" mode caps at 56 fps to stay within the limit. "Smooth 4K 60" trades a little sharpness for a steady 60.
+(H.264 receivers only.) 4096×2304 at 60 fps exceeds H.264 Level 5.2, and level 6 streams black-screen the hardware decoder on Intel iMacs. "Native" mode caps at 56 fps to stay within the limit. "Smooth 4K 60" trades a little sharpness for a steady 60.
 
 **Can I use an Intel MacBook as the main Mac?**
 It should work on macOS 13+, but it is untested. Reports welcome.
@@ -91,12 +93,12 @@ Yes. Ed25519 identity keys are pinned at pairing, session keys come from X25519,
 - Private API; may break on new macOS releases.
 - Input forwarding is basic: system shortcuts on the extra Mac (Cmd+Tab, Mission Control) stay local, and it needs Accessibility permission on the main Mac.
 - Sender needs macOS 13+.
-- One extra screen at a time.
+- Several extra screens work, but only the first one gets sound, and multi-screen has so far been tested only in code, not with three real Macs.
 - Not notarized.
 
 ## Roadmap
 
-HEVC option, multiple screens, signed and notarized releases, Homebrew cask.
+signed and notarized releases, Homebrew cask.
 
 ## Contributing
 

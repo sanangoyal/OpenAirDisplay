@@ -17,9 +17,10 @@ let autoLadder = 4
 let defaults = UserDefaults.standard
 func even(_ v: Double) -> Int { max(2, Int(v) & ~1) }
 /// H.264 Level 5.2 allows 2,073,600 macroblocks/s: cap fps so big frames stay at Level <= 5.2 (older hardware decoders reject Level 6)
-func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
+func effFps(_ w: Int, _ h: Int, _ f: Int, hevc: Bool = false) -> Int {
     let cap = defaults.integer(forKey: "fpsCap")
-    return min(cap > 0 ? min(f, cap) : f, 2_073_600 / (((w + 15) / 16) * ((h + 15) / 16)))
+    let want = cap > 0 ? min(f, cap) : f
+    return hevc ? want : min(want, 2_073_600 / (((w + 15) / 16) * ((h + 15) / 16)))   // HEVC has no such limit at these sizes
 }
 @available(macOS 13.0, *) func applyColor(_ cfg: SCStreamConfiguration) {
     switch defaults.string(forKey: "colorProfile") ?? "auto" {
@@ -74,6 +75,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
     var rxFrames = 0, lastRx = 0, rxFps = 0.0
     var statTimer: Timer?, idleTimer: Timer?
     var encInfo = "—"
+    var rxHEVC = false, hevc = false   // receiver can hardware-decode HEVC / this session uses it
     var pointW = 0, pointH = 0
     var lastPB: CVPixelBuffer?, lastEnc = Date.distantPast
     var audioOn = true
@@ -167,8 +169,10 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
             let name = o["name"] as? String ?? hs.peerName
             let macs = o["macs"] as? [String] ?? []
             let rver = o["ver"] as? String
+            let rhevc = o["hevc"] as? Bool ?? false
             DispatchQueue.main.async {
                 self.onVersion?(rver ?? "older")
+                self.rxHEVC = rhevc
                 if !macs.isEmpty, let pr = self.keys.peer(pub: self.hs.peerPub), pr.macs ?? [] != macs { self.keys.setMacs(id: pr.id, macs: macs) }
                 if self.live, w != self.rxW || h != self.rxH { self.end("Restarting"); return }   // receiver display changed: resize
                 self.goLive(name: name, w: w, h: h)
@@ -230,7 +234,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
             let pw = hi ? backW / 2 : backW, ph = hi ? backH / 2 : backH
             pointW = pw; pointH = ph
             let d = CGVirtualDisplayDescriptor()
-            d.name = "\(name) (Remote)"
+            d.name = receiverName.isEmpty ? "\(name) (Remote)" : receiverName
             d.vendorID = 0x1234; d.productID = 0x4321
             d.serialNum = UInt32(Keys.fp(hs.peerPub).prefix(8), radix: 16) ?? 1
             d.maxPixelsWide = UInt32(backW); d.maxPixelsHigh = UInt32(backH)
@@ -246,9 +250,10 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
             guard v.apply(st) else { end("Display settings failed"); return }
             vd = v; id = v.displayID
         }
+        hevc = rxHEVC && (defaults.string(forKey: "codec") ?? "auto") != "h264"
         let (cw, ch) = dims(preset); capW = cw; capH = ch
         guard makeEncoder(cw, ch) else { end("Encoder failed"); return }
-        let fpsT = effFps(cw, ch, preset.fps)
+        let fpsT = effFps(cw, ch, preset.fps, hevc: hevc)
 
         Task { [weak self] in
             guard let self = self else { return }
@@ -294,7 +299,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
         }
         let cfg = SCStreamConfiguration()
         cfg.width = w; cfg.height = h
-        cfg.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(effFps(w, h, p.fps)))
+        cfg.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(effFps(w, h, p.fps, hevc: hevc)))
         cfg.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         cfg.queueDepth = 3; cfg.showsCursor = true; applyColor(cfg)
         cfg.capturesAudio = true; cfg.sampleRate = 48000; cfg.channelCount = 2; cfg.excludesCurrentProcessAudio = true
@@ -338,7 +343,7 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
     func makeEncoder(_ w: Int, _ h: Int) -> Bool {
         var s: VTCompressionSession?
         let spec: [CFString: Any] = [kVTVideoEncoderSpecification_EnableLowLatencyRateControl: true]
-        guard VTCompressionSessionCreate(allocator: nil, width: Int32(w), height: Int32(h), codecType: kCMVideoCodecType_H264,
+        guard VTCompressionSessionCreate(allocator: nil, width: Int32(w), height: Int32(h), codecType: hevc ? kCMVideoCodecType_HEVC : kCMVideoCodecType_H264,
             encoderSpecification: spec as CFDictionary, imageBufferAttributes: nil, compressedDataAllocator: nil,
             outputCallback: nil, refcon: nil, compressionSessionOut: &s) == noErr, let sess = s else { return false }
         func set(_ k: CFString, _ v: Any) { VTSessionSetProperty(sess, key: k, value: v as CFTypeRef) }
@@ -346,10 +351,11 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
         set(kVTCompressionPropertyKey_AllowFrameReordering, false)
         set(kVTCompressionPropertyKey_MaxFrameDelayCount, 0)
         set(kVTCompressionPropertyKey_PrioritizeEncodingSpeedOverQuality, true)
-        let fp = effFps(w, h, preset.fps)
-        set(kVTCompressionPropertyKey_ProfileLevel, ((w + 15) / 16) * ((h + 15) / 16) * fp > 983_040 ? kVTProfileLevel_H264_High_5_2 : kVTProfileLevel_H264_High_AutoLevel)
+        let fp = effFps(w, h, preset.fps, hevc: hevc)
+        if hevc { set(kVTCompressionPropertyKey_ProfileLevel, kVTProfileLevel_HEVC_Main_AutoLevel) } else {
+        set(kVTCompressionPropertyKey_ProfileLevel, ((w + 15) / 16) * ((h + 15) / 16) * fp > 983_040 ? kVTProfileLevel_H264_High_5_2 : kVTProfileLevel_H264_High_AutoLevel) }
         let brOverride = defaults.bool(forKey: "bitrateOn") ? (defaults.object(forKey: "bitrateTarget") as? Int ?? 80) : 0
-        set(kVTCompressionPropertyKey_AverageBitRate, brOverride > 0 ? brOverride * 1_000_000 : Int(Double(w * h * fp) * preset.bpp))
+        set(kVTCompressionPropertyKey_AverageBitRate, brOverride > 0 ? brOverride * 1_000_000 : Int(Double(w * h * fp) * preset.bpp * (hevc ? 0.65 : 1.0)))
         switch defaults.string(forKey: "colorProfile") ?? "auto" {
         case "srgb":
             set(kVTCompressionPropertyKey_ColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2)
@@ -384,15 +390,23 @@ func effFps(_ w: Int, _ h: Int, _ f: Int) -> Int {
             if key, let fd = CMSampleBufferGetFormatDescription(sb) {
                 let w0 = self.capW, h0 = self.capH
                 var cfg = Data(); var count = 0
-                CMVideoFormatDescriptionGetH264ParameterSetAtIndex(fd, parameterSetIndex: 0, parameterSetPointerOut: nil, parameterSetSizeOut: nil, parameterSetCountOut: &count, nalUnitHeaderLengthOut: nil)
-                cfg.append(UInt8(count))
+                let isH = self.hevc
+                func ps(_ i: Int, _ ptr: inout UnsafePointer<UInt8>?, _ sz: inout Int, _ cnt: UnsafeMutablePointer<Int>?) {
+                    if isH { CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(fd, parameterSetIndex: i, parameterSetPointerOut: &ptr, parameterSetSizeOut: &sz, parameterSetCountOut: cnt, nalUnitHeaderLengthOut: nil) }
+                    else { CMVideoFormatDescriptionGetH264ParameterSetAtIndex(fd, parameterSetIndex: i, parameterSetPointerOut: &ptr, parameterSetSizeOut: &sz, parameterSetCountOut: cnt, nalUnitHeaderLengthOut: nil) }
+                }
+                var p0: UnsafePointer<UInt8>? = nil; var s0 = 0
+                ps(0, &p0, &s0, &count)
+                cfg.append(UInt8(count) | (isH ? 0x80 : 0))   // high bit = HEVC
                 for i in 0..<count {
                     var ptr: UnsafePointer<UInt8>? = nil; var sz = 0
-                    CMVideoFormatDescriptionGetH264ParameterSetAtIndex(fd, parameterSetIndex: i, parameterSetPointerOut: &ptr, parameterSetSizeOut: &sz, parameterSetCountOut: nil, nalUnitHeaderLengthOut: nil)
+                    ps(i, &ptr, &sz, nil)
                     var l = UInt16(sz).bigEndian
                     withUnsafeBytes(of: &l) { cfg.append(contentsOf: $0) }
-                    if i == 0, sz > 3 { self.encInfo = "\(ptr![1] == 100 ? "High" : ptr![1] == 77 ? "Main" : "Baseline") L\(Double(ptr![3]) / 10)" }
-                    if i == 0, sz > 3 { try? "\(Date()) \(w0)x\(h0) profile_idc=\(ptr![1]) level_idc=\(ptr![3])\n".write(toFile: "/tmp/imd-level.log", atomically: true, encoding: .utf8) }
+                    if i == 0, sz > 3 {
+                        if isH { self.encInfo = "HEVC Main" }
+                        else { self.encInfo = "\(ptr![1] == 100 ? "High" : ptr![1] == 77 ? "Main" : "Baseline") L\(Double(ptr![3]) / 10)" }
+                    }
                     cfg.append(ptr!, count: sz)
                 }
                 self.send(MT.config, cfg)
